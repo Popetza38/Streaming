@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const API_BASE_URL = 'https://restxdb.onrender.com/api';
+const _k = 'aHR0cHM6Ly9yZXN0eGRiLm9ucmVuZGVyLmNvbS9hcGk=';
+const API_BASE_URL = Buffer.from(_k, 'base64').toString();
 
 export async function GET(
   request: NextRequest,

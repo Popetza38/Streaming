@@ -98,7 +98,6 @@ src/
 
 ## 🔌 API
 
-Base URL: `https://restxdb.onrender.com/api`
 
 | Endpoint | คำอธิบาย |
 |----------|---------|
