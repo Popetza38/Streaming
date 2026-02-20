@@ -34,11 +34,20 @@ export default function VideoPlayer({
   const [showControls, setShowControls] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-
+  const hlsRef = useRef<any>(null);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
+
+    // Destroy previous HLS instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    setLoading(true);
+    setError(false);
 
     const isHLS = videoUrl.includes('.m3u8');
 
@@ -46,6 +55,7 @@ export default function VideoPlayer({
       import('hls.js').then(({ default: Hls }) => {
         if (Hls.isSupported()) {
           const hls = new Hls();
+          hlsRef.current = hls;
           hls.loadSource(videoUrl);
           hls.attachMedia(video);
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -60,7 +70,6 @@ export default function VideoPlayer({
               setLoading(false);
             }
           });
-          return () => hls.destroy();
         } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
           video.src = videoUrl;
           setLoading(false);
@@ -72,6 +81,13 @@ export default function VideoPlayer({
       setLoading(false);
       video.play().then(() => setPlaying(true)).catch(() => { });
     }
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+    };
   }, [videoUrl]);
 
   useEffect(() => {

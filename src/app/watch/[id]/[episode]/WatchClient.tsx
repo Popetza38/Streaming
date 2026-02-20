@@ -99,7 +99,6 @@ export default function WatchClient({
             <div className="relative rounded-xl overflow-hidden bg-black shadow-2xl shadow-black/50">
               <div className={`transition-opacity duration-300 ${transitioning ? 'opacity-30' : 'opacity-100'}`}>
                 <VideoPlayer
-                  key={`${dramaId}-${activeEpisode}`}
                   videoUrl={videoUrl}
                   onPrevious={handlePrevious}
                   onNext={handleNext}
