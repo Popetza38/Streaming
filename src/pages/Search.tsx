@@ -1,235 +1,147 @@
 import { useState, useEffect } from 'react';
-import { Search as SearchIcon, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Search as SearchIcon, TrendingUp, Play } from 'lucide-react';
 import { useLanguage } from '../store/language';
-
-interface Drama {
-  bookId: string;
-  bookName: string;
-  introduction: string;
-  cover: string;
-  playCount: string;
-}
+import { useSource } from '../store/source';
+import { getProvider, type UnifiedDrama } from '../api/providers';
 
 const Search = () => {
   const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<Drama[]>([]);
-  const [results, setResults] = useState<Drama[]>([]);
-  const [popularDramas, setPopularDramas] = useState<Drama[]>([]);
+  const [results, setResults] = useState<UnifiedDrama[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [focused, setFocused] = useState(false);
   const { lang } = useLanguage();
+  const { source } = useSource();
 
-  // Fetch popular dramas on mount
   useEffect(() => {
-    const fetchPopular = async () => {
-      try {
-        const response = await fetch(`/api/rank/2?lang=${lang}`);
-        const data = await response.json();
-        if (data.success) {
-          setPopularDramas(data.data.list);
-        }
-      } catch (error) {
-        console.error('Failed to fetch popular dramas:', error);
-      }
-    };
-
-    fetchPopular();
-  }, [lang]);
-
-  const fetchSuggestions = async (q: string) => {
-    if (!q.trim()) {
-      setSuggestions([]);
-      setShowSuggestions(false);
+    if (!query.trim()) {
+      setResults([]);
       return;
     }
 
-    try {
-      const response = await fetch(`/api/suggest/${encodeURIComponent(q)}?lang=${lang}`);
-      const data = await response.json();
-      if (data.success) {
-        setSuggestions(data.data.suggestList.slice(0, 5));
-        setShowSuggestions(true);
+    const searchDramas = async () => {
+      setLoading(true);
+      try {
+        const provider = getProvider(source);
+        const list = await provider.search(query, lang, 1);
+        setResults(list);
+      } catch (error) {
+        console.error('Error searching:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to fetch suggestions:', error);
-    }
-  };
+    };
 
-  const handleSearch = async (q: string) => {
-    if (!q.trim()) return;
-
-    setLoading(true);
-    setShowSuggestions(false);
-
-    try {
-      const response = await fetch(`/api/search/${encodeURIComponent(q)}/1?lang=${lang}&pageSize=20`);
-      const data = await response.json();
-      if (data.success) {
-        setResults(data.data.list);
-      }
-    } catch (error) {
-      console.error('Failed to search:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInputChange = (value: string) => {
-    setQuery(value);
-    if (value.trim()) {
-      const debounce = setTimeout(() => fetchSuggestions(value), 200);
-      return () => clearTimeout(debounce);
-    } else {
-      setSuggestions([]);
-      setResults([]);
-      setShowSuggestions(false);
-    }
-  };
-
-  const selectSuggestion = (suggestion: Drama) => {
-    setQuery(suggestion.bookName.trim());
-    setShowSuggestions(false);
-    handleSearch(suggestion.bookName.trim());
-  };
+    const debounce = setTimeout(searchDramas, 300);
+    return () => clearTimeout(debounce);
+  }, [query, lang, source]);
 
   return (
-    <div className="space-y-4 pt-2">
-      {/* Search Input */}
-      <div className="relative">
-        <SearchIcon size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400" />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => handleInputChange(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch(query)}
-          placeholder="Search dramas..."
-          className="w-full pl-10 pr-10 py-3.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-sm placeholder-zinc-400 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30"
-          autoFocus
-        />
-        {query && (
-          <button
-            onClick={() => {
-              setQuery('');
-              setSuggestions([]);
-              setResults([]);
-              setShowSuggestions(false);
-            }}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-white"
-          >
-            <X size={18} />
-          </button>
+    <div className="min-h-screen text-white pb-20 pt-2">
+      <div className="max-w-4xl mx-auto">
+        {/* Search Bar */}
+        <div className="sticky top-16 z-10 bg-[#0a0a0f]/95 backdrop-blur-xl pb-4 -mx-4 px-4">
+          <div className={`relative transition-all duration-300 ${focused ? 'scale-[1.02]' : ''}`}>
+            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 transition-colors" size={20} />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder="Search dramas..."
+              className={`w-full bg-white/5 text-white pl-12 pr-4 py-3.5 rounded-xl focus:outline-none transition-all duration-300 border ${focused
+                ? 'border-[#e50914]/50 bg-white/8 shadow-lg shadow-[#e50914]/10'
+                : 'border-white/5 hover:border-white/10'
+                }`}
+              autoFocus
+            />
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors text-sm"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Loading */}
+        {loading && (
+          <div className="flex justify-center py-12">
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 border-2 border-[#e50914] border-t-transparent rounded-full animate-spin" />
+              <span className="text-zinc-500 text-sm">Searching...</span>
+            </div>
+          </div>
         )}
 
-        {/* Suggestions */}
-        {showSuggestions && suggestions.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-2 card max-h-96 overflow-y-auto z-50">
-            {suggestions.map((suggestion) => (
-              <button
-                key={suggestion.bookId}
-                onClick={() => selectSuggestion(suggestion)}
-                className="w-full text-left p-3.5 hover:bg-zinc-800 active:bg-zinc-700 transition-colors flex gap-3 border-b border-zinc-800 last:border-0"
-              >
-                <img
-                  src={suggestion.cover}
-                  alt={suggestion.bookName}
-                  className="w-12 h-16 object-cover rounded flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-white text-sm line-clamp-2 mb-1">
-                    {suggestion.bookName.trim()}
-                  </h4>
-                  <p className="text-xs text-muted line-clamp-2">
-                    {suggestion.introduction}
-                  </p>
-                </div>
-              </button>
-            ))}
+        {/* Results */}
+        {!loading && results.length > 0 && (
+          <div className="animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-medium text-zinc-400">
+                {results.length} results for "<span className="text-white">{query}</span>"
+              </h2>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
+              {results.map((drama, i) => (
+                <Link
+                  key={drama.id}
+                  to={`/watch/${drama.id}`}
+                  state={{ name: drama.name, cover: drama.cover, episodes: drama.episodes }}
+                  className="block animate-fade-in"
+                  style={{ animationDelay: `${i * 0.05}s` }}
+                >
+                  <div className="drama-card">
+                    <div className="aspect-[2/3] bg-zinc-900">
+                      <img
+                        src={drama.cover}
+                        alt={drama.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="drama-overlay" />
+                    <div className="drama-info">
+                      <Play size={24} className="text-white mx-auto fill-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-sm font-medium mt-2 line-clamp-2 text-zinc-200">
+                    {drama.name}
+                  </h3>
+                  {drama.episodes > 0 && (
+                    <p className="text-xs text-zinc-500 mt-0.5">{drama.episodes} episodes</p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* No Results */}
+        {!loading && query && results.length === 0 && (
+          <div className="text-center py-20 animate-fade-in">
+            <div className="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <SearchIcon size={32} className="text-zinc-600" />
+            </div>
+            <p className="text-zinc-400 font-medium">No results for "{query}"</p>
+            <p className="text-zinc-600 text-sm mt-1">Try different keywords</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!query && (
+          <div className="text-center py-20 animate-fade-in">
+            <div className="w-20 h-20 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-5">
+              <TrendingUp size={32} className="text-zinc-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-zinc-300 mb-1">Discover Content</h3>
+            <p className="text-zinc-600 text-sm">Search for your favorite dramas</p>
           </div>
         )}
       </div>
-
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full"></div>
-        </div>
-      )}
-
-      {/* Results */}
-      {!loading && results.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold mb-3 text-zinc-300">
-            {results.length} results for "{query}"
-          </h2>
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-            {results.map((drama) => (
-              <Link key={drama.bookId} to={`/watch/${drama.bookId}`} className="group">
-                <div className="aspect-[3/4] rounded-lg overflow-hidden mb-2 bg-zinc-900">
-                  <img
-                    src={drama.cover}
-                    alt={drama.bookName}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                  />
-                </div>
-                <h3 className="text-xs font-medium line-clamp-2 mb-1 leading-tight">
-                  {drama.bookName.trim()}
-                </h3>
-                <p className="text-xs text-muted">{drama.playCount}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* No Results */}
-      {!loading && query && results.length === 0 && !showSuggestions && (
-        <div className="text-center py-16 text-muted">
-          <SearchIcon size={40} className="mx-auto mb-3 opacity-50" />
-          <p className="text-sm">No results for "{query}"</p>
-          <p className="text-xs mt-1">Try different keywords</p>
-        </div>
-      )}
-
-      {/* Empty State - Show Popular Searches */}
-      {!query && popularDramas.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold mb-3 text-zinc-300">Popular Searches</h2>
-          <div className="space-y-3">
-            {popularDramas.map((drama, index) => (
-              <Link key={drama.bookId} to={`/watch/${drama.bookId}`} className="card p-3.5 flex gap-3 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
-                <div className="relative flex-shrink-0">
-                  <img
-                    src={drama.cover}
-                    alt={drama.bookName}
-                    className="w-16 h-20 object-cover rounded-lg"
-                  />
-                  <div className="absolute -top-1 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                    {index + 1}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-sm mb-1 line-clamp-2">
-                    {drama.bookName.trim()}
-                  </h3>
-                  <p className="text-xs text-muted line-clamp-2 mb-2">
-                    {drama.introduction}
-                  </p>
-                  <p className="text-xs text-muted">{drama.playCount} views</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!query && popularDramas.length === 0 && (
-        <div className="text-center py-16 text-muted">
-          <SearchIcon size={40} className="mx-auto mb-3 opacity-50" />
-          <h3 className="font-semibold mb-1">Search Dramas</h3>
-          <p className="text-sm">Type to search your favorite dramas</p>
-        </div>
-      )}
     </div>
   );
 };
