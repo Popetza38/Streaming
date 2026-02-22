@@ -4,19 +4,11 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/api/dramabox/:path*",
-      "destination": "/api/proxy"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "/api/proxy"
-    },
-    {
       "source": "/video",
       "destination": "/api/video"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ]
