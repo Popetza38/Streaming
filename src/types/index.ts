@@ -22,18 +22,17 @@ export interface Chapter {
   isPay: number
 }
 
-export interface VideoUrls {
-  video_480?: string
-  video_720?: string
-  video_1080?: string
+export interface VideoQuality {
+  quality: number
+  videoPath: string
+  isDefault: number
 }
 
-export interface PlayData {
-  id: number
-  name: string
-  episode: number
-  total: number
-  video: VideoUrls
-  expires: number
-  expires_in: number
+export interface WatchData {
+  bookId: string
+  chapterIndex: number
+  videoUrl: string
+  qualities: VideoQuality[]
+  cover: string
+  bookName: string
 }

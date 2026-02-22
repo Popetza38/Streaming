@@ -1,188 +1,259 @@
+import { Play, Users, Clock } from 'lucide-react';
+import { useDramas, useInfiniteDramas, useRankDramas } from '../hooks/useDramas';
 import { Link } from 'react-router-dom';
-import { Play, ChevronRight } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { useDramas, useRomanceDramas } from '../hooks/useDramas';
-import { useSource } from '../store/source';
+import { useEffect, useCallback } from 'react';
+import HeroBanner from '../components/HeroBanner';
+import Carousel from '../components/Carousel';
+import { useWatchHistory } from '../store/watchHistory';
+import { usePageMeta } from '../hooks/usePageMeta';
 
-const Home = () => {
-  const { dramas: featured, loading: featuredLoading, hasMore, loadMore } = useDramas();
-  const { dramas: romance, loading: romanceLoading } = useRomanceDramas();
-  const { source } = useSource();
-  const loaderRef = useRef<HTMLDivElement>(null);
-  const [heroImgLoaded, setHeroImgLoaded] = useState(false);
+/* ===== Skeleton Loaders ===== */
+const SkeletonBanner = () => <div className="skeleton skeleton-banner" />;
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore) {
-          loadMore();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (loaderRef.current) observer.observe(loaderRef.current);
-    return () => observer.disconnect();
-  }, [hasMore, loadMore]);
-
-  // Reset hero image state when source changes
-  useEffect(() => {
-    setHeroImgLoaded(false);
-  }, [source]);
-
-  if (featuredLoading && featured.length === 0) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-3 border-[#e50914] border-t-transparent rounded-full animate-spin" />
-          <p className="text-zinc-500 text-sm font-medium">Loading content...</p>
-        </div>
+const SkeletonCards = ({ count = 6 }: { count?: number }) => (
+  <div className="carousel-scroll">
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={i} className="skeleton-card">
+        <div className="skeleton skeleton-card-poster" />
+        <div className="skeleton skeleton-card-title" />
+        <div className="skeleton skeleton-card-sub" />
       </div>
-    );
-  }
+    ))}
+  </div>
+);
 
-  const dramaLink = (drama: any) => ({
-    pathname: `/watch/${drama.id}`,
-    state: { name: drama.name, cover: drama.cover, episodes: drama.episodes },
-  });
+/* ===== Continue Watching Card ===== */
+const ContinueWatchingItem = ({ item }: { item: any }) => {
+  const progress = item.videoDuration > 0 ? (item.videoTime / item.videoDuration) * 100 : 0;
+  const timeAgo = getTimeAgo(item.timestamp);
 
   return (
-    <div className="min-h-screen text-white space-y-8 -mx-4 sm:-mx-6 lg:-mx-8">
-      {/* Hero Banner */}
-      {featured[0] && (
-        <Link to={`/watch/${featured[0].id}`} state={{ name: featured[0].name, cover: featured[0].cover, episodes: featured[0].episodes }} className="block relative group">
-          <div className="relative w-full aspect-[16/7] sm:aspect-[21/9] overflow-hidden">
-            {!heroImgLoaded && (
-              <div className="absolute inset-0 skeleton" />
-            )}
-            <img
-              src={featured[0].cover}
-              alt={featured[0].name}
-              className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${heroImgLoaded ? 'opacity-100' : 'opacity-0'}`}
-              onLoad={() => setHeroImgLoaded(true)}
-            />
-            {/* Overlays */}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/30 to-transparent" />
-            <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0f]/80 via-transparent to-transparent" />
-
-            {/* Content */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10 lg:p-16">
-              <div className="max-w-2xl animate-slide-up">
-                <div className="inline-flex items-center gap-2 bg-[#e50914] text-white text-xs font-bold px-3 py-1.5 rounded-full mb-4 shadow-lg">
-                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                  FEATURED
-                </div>
-                <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black mb-3 leading-tight line-clamp-2">
-                  {featured[0].name}
-                </h1>
-                {featured[0].summary && (
-                  <p className="text-sm sm:text-base text-zinc-300 mb-6 line-clamp-2 max-w-xl">
-                    {featured[0].summary}
-                  </p>
-                )}
-                <div className="flex items-center gap-3">
-                  <div className="btn-primary inline-flex items-center gap-2 text-sm sm:text-base group-hover:scale-105 transition-transform">
-                    <Play size={18} className="fill-white" />
-                    Watch Now
-                  </div>
-                </div>
-              </div>
-            </div>
+    <Link
+      to={`/watch/${item.bookId}`}
+      className="drama-card flex-shrink-0"
+      style={{ width: 140 }}
+    >
+      <div className="drama-poster relative">
+        <img src={item.cover} alt={item.bookName} loading="lazy" />
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-700">
+          <div className="h-full bg-red-500 rounded-r" style={{ width: `${Math.min(progress, 100)}%` }} />
+        </div>
+        <div className="absolute top-1.5 right-1.5 bg-black/70 text-[10px] text-white px-1.5 py-0.5 rounded">
+          EP {item.episode}
+        </div>
+        <div className="drama-overlay">
+          <div className="drama-overlay-play">
+            <Play size={18} className="text-white ml-0.5" />
           </div>
-        </Link>
+        </div>
+      </div>
+      <h3 className="text-xs font-medium line-clamp-1 mt-1.5 mb-0.5">
+        {item.bookName.trim()}
+      </h3>
+      <div className="flex items-center gap-1 text-[10px] text-zinc-500">
+        <Clock size={10} />
+        <span>{timeAgo}</span>
+      </div>
+    </Link>
+  );
+};
+
+function getTimeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+/* ===== Drama Card (inline) ===== */
+const DramaItem = ({ drama }: { drama: any }) => (
+  <Link
+    to={`/watch/${drama.bookId}`}
+    className="drama-card"
+    style={{ width: 150 }}
+  >
+    <div className="drama-poster">
+      <img src={drama.cover} alt={drama.bookName} loading="lazy" />
+      {drama.corner && (
+        <div
+          className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10"
+          style={{ backgroundColor: drama.corner.color }}
+        >
+          {drama.corner.name}
+        </div>
+      )}
+      {drama.rank && (
+        <div className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10">
+          🔥 {drama.rank.hotCode}
+        </div>
+      )}
+      <div className="drama-overlay">
+        <div className="drama-overlay-play">
+          <Play size={18} className="text-white ml-0.5" />
+        </div>
+      </div>
+    </div>
+    <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-1">
+      {drama.bookName.trim()}
+    </h3>
+    <div className="flex items-center gap-1 text-xs text-muted">
+      <Users size={11} />
+      <span>{drama.playCount}</span>
+    </div>
+  </Link>
+);
+
+/* ===== Grid Drama Card ===== */
+const GridDramaItem = ({ drama }: { drama: any }) => (
+  <Link to={`/watch/${drama.bookId}`} className="drama-card block">
+    <div className="drama-poster">
+      <img src={drama.cover} alt={drama.bookName} loading="lazy" />
+      {drama.corner && (
+        <div
+          className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10"
+          style={{ backgroundColor: drama.corner.color }}
+        >
+          {drama.corner.name}
+        </div>
+      )}
+      {drama.rank && (
+        <div className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10">
+          🔥 {drama.rank.hotCode}
+        </div>
+      )}
+      <div className="drama-overlay">
+        <div className="drama-overlay-play">
+          <Play size={18} className="text-white ml-0.5" />
+        </div>
+      </div>
+    </div>
+    <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-1">
+      {drama.bookName.trim()}
+    </h3>
+    <div className="flex items-center gap-1 text-xs text-muted">
+      <Users size={11} />
+      <span>{drama.playCount}</span>
+    </div>
+  </Link>
+);
+
+const Home = () => {
+  const { dramas: featuredDramas, loading: featuredLoading } = useDramas();
+  const { dramas: rankDramas, loading: rankLoading } = useRankDramas();
+  const { dramas, loading, loadingMore, hasMore, loadMore } = useInfiniteDramas();
+  const { history } = useWatchHistory();
+  usePageMeta();
+
+  // Infinite scroll
+  const handleScroll = useCallback(() => {
+    if (window.innerHeight + document.documentElement.scrollTop >= document.documentElement.offsetHeight - 1000) {
+      if (hasMore && !loadingMore) loadMore();
+    }
+  }, [hasMore, loadingMore, loadMore]);
+
+  useEffect(() => {
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
+  return (
+    <div className="space-y-8 pt-2 pb-4">
+      {/* ===== Hero Banner ===== */}
+      {featuredLoading ? (
+        <SkeletonBanner />
+      ) : (
+        <HeroBanner dramas={featuredDramas} />
       )}
 
-      <div className="px-4 sm:px-6 lg:px-8 space-y-10">
-        {/* Romance / New Releases Carousel */}
-        {!romanceLoading && romance.length > 0 && (
-          <section className="animate-fade-in">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg sm:text-xl font-bold">
-                {source === 'dramabox' ? 'New Releases' : 'Romance'}
-              </h2>
-              <button className="text-sm text-zinc-400 hover:text-white flex items-center gap-1 transition-colors">
-                See all <ChevronRight size={16} />
-              </button>
-            </div>
-            <div className="flex gap-3 sm:gap-4 overflow-x-auto scrollbar-hide scroll-snap-x pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-              {romance.slice(0, 12).map((drama) => (
-                <Link
-                  key={drama.id}
-                  to={`/watch/${drama.id}`}
-                  state={{ name: drama.name, cover: drama.cover, episodes: drama.episodes }}
-                  className="flex-shrink-0 w-[130px] sm:w-[160px]"
-                >
-                  <div className="drama-card">
-                    <div className="aspect-[2/3] bg-zinc-900">
-                      <img
-                        src={drama.cover}
-                        alt={drama.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                    <div className="drama-overlay" />
-                    <div className="drama-info">
-                      <Play size={24} className="text-white mx-auto mb-1 fill-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-sm font-medium mt-2 line-clamp-2 text-zinc-200">
-                    {drama.name}
-                  </h3>
-                  <p className="text-xs text-zinc-500 mt-0.5">{drama.episodes} episodes</p>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
+      {/* ===== Continue Watching ===== */}
+      {history.length > 0 && (
+        <Carousel title="⏯️ Continue Watching">
+          {history.slice(0, 10).map((item) => (
+            <ContinueWatchingItem key={item.bookId} item={item} />
+          ))}
+        </Carousel>
+      )}
 
-        {/* For You Grid */}
-        {featured.length > 1 && (
-          <section>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg sm:text-xl font-bold">For You</h2>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-              {featured.slice(1).map((drama, i) => (
-                <Link
-                  key={drama.id}
-                  to={`/watch/${drama.id}`}
-                  state={{ name: drama.name, cover: drama.cover, episodes: drama.episodes }}
-                  className="block animate-fade-in"
-                  style={{ animationDelay: `${(i % 6) * 0.05}s` }}
-                >
-                  <div className="drama-card">
-                    <div className="aspect-[2/3] bg-zinc-900">
-                      <img
-                        src={drama.cover}
-                        alt={drama.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    </div>
-                    <div className="drama-overlay" />
-                    <div className="drama-info">
-                      <Play size={24} className="text-white mx-auto mb-1 fill-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-sm font-medium mt-2 line-clamp-2 text-zinc-200">
-                    {drama.name}
-                  </h3>
-                  <p className="text-xs text-zinc-500 mt-0.5">{drama.episodes} episodes</p>
-                </Link>
+      {/* ===== For You Carousel ===== */}
+      {featuredLoading ? (
+        <div>
+          <div className="skeleton" style={{ width: 100, height: 20, marginBottom: 14 }} />
+          <SkeletonCards />
+        </div>
+      ) : featuredDramas.length > 1 ? (
+        <Carousel title="🎬 For You">
+          {featuredDramas.slice(1).map((drama, i) => (
+            <DramaItem key={`fy-${drama.bookId}-${i}`} drama={drama} />
+          ))}
+        </Carousel>
+      ) : null}
+
+      <div className="section-divider" />
+
+      {/* ===== Trending / Rank Carousel ===== */}
+      {rankLoading ? (
+        <div>
+          <div className="skeleton" style={{ width: 120, height: 20, marginBottom: 14 }} />
+          <SkeletonCards />
+        </div>
+      ) : rankDramas.length > 0 ? (
+        <Carousel title="🔥 Trending">
+          {rankDramas.map((drama, i) => (
+            <DramaItem key={`rank-${drama.bookId}-${i}`} drama={drama} />
+          ))}
+        </Carousel>
+      ) : null}
+
+      <div className="section-divider" />
+
+      {/* ===== New Dramas Grid ===== */}
+      <div>
+        <h2 className="text-lg font-bold mb-4">✨ New Dramas</h2>
+
+        {loading && dramas.length === 0 ? (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i}>
+                <div className="skeleton" style={{ aspectRatio: '3/4', borderRadius: 10, marginBottom: 8 }} />
+                <div className="skeleton" style={{ height: 14, width: '80%', marginBottom: 6 }} />
+                <div className="skeleton" style={{ height: 10, width: '50%' }} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+              {dramas.map((drama, index) => (
+                <GridDramaItem key={`${drama.bookId}-${index}`} drama={drama} />
               ))}
             </div>
 
-            {/* Infinite scroll loader */}
-            <div ref={loaderRef} className="flex justify-center py-8">
-              {featuredLoading && (
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 border-2 border-[#e50914] border-t-transparent rounded-full animate-spin" />
-                  <span className="text-zinc-500 text-sm">Loading more...</span>
-                </div>
-              )}
-            </div>
-          </section>
+            {/* Loading More */}
+            {loadingMore && (
+              <div className="flex items-center justify-center py-6">
+                <div className="animate-spin w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
+                <span className="ml-2 text-sm text-muted">Loading more...</span>
+              </div>
+            )}
+
+            {hasMore && !loadingMore && (
+              <div className="text-center py-6">
+                <button onClick={loadMore} className="btn-primary">
+                  Load More ({dramas.length} loaded)
+                </button>
+              </div>
+            )}
+
+            {!hasMore && dramas.length > 0 && (
+              <div className="text-center py-6 text-sm text-muted">
+                All dramas loaded ({dramas.length} total)
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
