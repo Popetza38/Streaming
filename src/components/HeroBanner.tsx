@@ -1,19 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Play, ChevronLeft, ChevronRight } from 'lucide-react';
-
-interface Drama {
-    bookId: string;
-    bookName: string;
-    introduction: string;
-    cover: string;
-    playCount: string;
-    tags: string[];
-    corner?: { name: string; color: string };
-}
+import type { NormalizedDrama } from '../utils/normalize';
 
 interface HeroBannerProps {
-    dramas: Drama[];
+    dramas: NormalizedDrama[];
     interval?: number;
 }
 
@@ -47,10 +38,10 @@ const HeroBanner = ({ dramas, interval = 5000 }: HeroBannerProps) => {
             <div className="hero-slides">
                 {items.map((drama, idx) => (
                     <div
-                        key={drama.bookId}
+                        key={drama.id}
                         className={`hero-slide ${idx === current ? 'active' : ''}`}
                     >
-                        <img src={drama.cover} alt={drama.bookName} />
+                        <img src={drama.cover} alt={drama.name} />
                         <div className="hero-gradient" />
                         <div className="hero-content">
                             {drama.corner && (
@@ -61,15 +52,17 @@ const HeroBanner = ({ dramas, interval = 5000 }: HeroBannerProps) => {
                                     {drama.corner.name}
                                 </span>
                             )}
-                            <h2 className="hero-title">{drama.bookName.trim()}</h2>
-                            <p className="hero-desc">{drama.introduction}</p>
+                            <h2 className="hero-title">{drama.name}</h2>
+                            <p className="hero-desc">{drama.summary}</p>
                             <div className="hero-meta">
                                 {drama.tags?.slice(0, 3).map(tag => (
                                     <span key={tag} className="hero-tag">{tag}</span>
                                 ))}
-                                <span className="hero-plays">▶ {drama.playCount}</span>
+                                {drama.playCount && (
+                                    <span className="hero-plays">▶ {drama.playCount}</span>
+                                )}
                             </div>
-                            <Link to={`/watch/${drama.bookId}`} className="hero-play-btn">
+                            <Link to={`/watch/${drama.id}`} className="hero-play-btn">
                                 <Play size={18} />
                                 <span>Watch Now</span>
                             </Link>

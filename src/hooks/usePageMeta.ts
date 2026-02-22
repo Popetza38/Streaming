@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
-const defaultTitle = 'DramaPop – Watch Free Short Dramas';
+const defaultTitle = 'DramaBox – Watch Free Short Dramas';
 const defaultDescription = 'Watch free short dramas online. Trending, romance, action, and more.';
 
 export function usePageMeta(title?: string, description?: string) {
@@ -9,7 +9,7 @@ export function usePageMeta(title?: string, description?: string) {
 
     useEffect(() => {
         // Title
-        document.title = title ? `${title} | DramaPop` : defaultTitle;
+        document.title = title ? `${title} | DramaBox` : defaultTitle;
 
         // Meta description
         let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement;

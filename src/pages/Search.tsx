@@ -2,32 +2,42 @@ import { useState, useEffect } from 'react';
 import { Search as SearchIcon, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../store/language';
-
-interface Drama {
-  bookId: string;
-  bookName: string;
-  introduction: string;
-  cover: string;
-  playCount: string;
-}
+import { usePlatform } from '../store/platform';
+import type { NormalizedDrama } from '../utils/normalize';
+import { normalizeDramaList, extractList } from '../utils/normalize';
 
 const Search = () => {
   const [query, setQuery] = useState('');
-  const [suggestions, setSuggestions] = useState<Drama[]>([]);
-  const [results, setResults] = useState<Drama[]>([]);
-  const [popularDramas, setPopularDramas] = useState<Drama[]>([]);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [results, setResults] = useState<NormalizedDrama[]>([]);
+  const [popularDramas, setPopularDramas] = useState<NormalizedDrama[]>([]);
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const { lang } = useLanguage();
+  const { platform } = usePlatform();
 
   // Fetch popular dramas on mount
   useEffect(() => {
     const fetchPopular = async () => {
       try {
-        const response = await fetch(`/api/rank/2?lang=${lang}`);
+        let url: string;
+        if (platform === 'shortmax') {
+          url = `/api/feed?type=vip&lang=${lang}&platform=shortmax`;
+        } else {
+          url = `/api/rank/2?lang=${lang}&platform=dramabox`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
-        if (data.success) {
-          setPopularDramas(data.data.list);
+
+        if (platform === 'shortmax') {
+          const items = data?.data || [];
+          const list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
+          setPopularDramas(normalizeDramaList(list, platform));
+        } else {
+          if (data.success) {
+            setPopularDramas(normalizeDramaList(data.data.list, platform));
+          }
         }
       } catch (error) {
         console.error('Failed to fetch popular dramas:', error);
@@ -35,7 +45,7 @@ const Search = () => {
     };
 
     fetchPopular();
-  }, [lang]);
+  }, [lang, platform]);
 
   const fetchSuggestions = async (q: string) => {
     if (!q.trim()) {
@@ -44,8 +54,14 @@ const Search = () => {
       return;
     }
 
+    if (platform === 'shortmax') {
+      // ShortMax doesn't have suggest endpoint, skip
+      setShowSuggestions(false);
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/suggest/${encodeURIComponent(q)}?lang=${lang}`);
+      const response = await fetch(`/api/suggest/${encodeURIComponent(q)}?lang=${lang}&platform=dramabox`);
       const data = await response.json();
       if (data.success) {
         setSuggestions(data.data.suggestList.slice(0, 5));
@@ -63,11 +79,17 @@ const Search = () => {
     setShowSuggestions(false);
 
     try {
-      const response = await fetch(`/api/search/${encodeURIComponent(q)}/1?lang=${lang}&pageSize=20`);
-      const data = await response.json();
-      if (data.success) {
-        setResults(data.data.list);
+      let url: string;
+      if (platform === 'shortmax') {
+        url = `/api/search?q=${encodeURIComponent(q)}&lang=${lang}&platform=shortmax`;
+      } else {
+        url = `/api/search/${encodeURIComponent(q)}/1?lang=${lang}&pageSize=20&platform=dramabox`;
       }
+
+      const response = await fetch(url);
+      const data = await response.json();
+      const list = extractList(data, platform);
+      setResults(normalizeDramaList(list, platform));
     } catch (error) {
       console.error('Failed to search:', error);
     } finally {
@@ -78,7 +100,13 @@ const Search = () => {
   const handleInputChange = (value: string) => {
     setQuery(value);
     if (value.trim()) {
-      const debounce = setTimeout(() => fetchSuggestions(value), 200);
+      const debounce = setTimeout(() => {
+        fetchSuggestions(value);
+        // For ShortMax, search directly on input change
+        if (platform === 'shortmax') {
+          handleSearch(value);
+        }
+      }, 300);
       return () => clearTimeout(debounce);
     } else {
       setSuggestions([]);
@@ -87,10 +115,11 @@ const Search = () => {
     }
   };
 
-  const selectSuggestion = (suggestion: Drama) => {
-    setQuery(suggestion.bookName.trim());
+  const selectSuggestion = (suggestion: any) => {
+    const name = (suggestion.bookName || suggestion.name || '').trim();
+    setQuery(name);
     setShowSuggestions(false);
-    handleSearch(suggestion.bookName.trim());
+    handleSearch(name);
   };
 
   return (
@@ -121,7 +150,7 @@ const Search = () => {
           </button>
         )}
 
-        {/* Suggestions */}
+        {/* Suggestions (DramaBox only) */}
         {showSuggestions && suggestions.length > 0 && (
           <div className="absolute top-full left-0 right-0 mt-2 card max-h-96 overflow-y-auto z-50">
             {suggestions.map((suggestion) => (
@@ -137,7 +166,7 @@ const Search = () => {
                 />
                 <div className="flex-1 min-w-0">
                   <h4 className="font-medium text-white text-sm line-clamp-2 mb-1">
-                    {suggestion.bookName.trim()}
+                    {(suggestion.bookName || '').trim()}
                   </h4>
                   <p className="text-xs text-muted line-clamp-2">
                     {suggestion.introduction}
@@ -164,18 +193,20 @@ const Search = () => {
           </h2>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
             {results.map((drama) => (
-              <Link key={drama.bookId} to={`/watch/${drama.bookId}`} className="group">
+              <Link key={drama.id} to={`/watch/${drama.id}`} className="group">
                 <div className="aspect-[3/4] rounded-lg overflow-hidden mb-2 bg-zinc-900">
                   <img
                     src={drama.cover}
-                    alt={drama.bookName}
+                    alt={drama.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                   />
                 </div>
                 <h3 className="text-xs font-medium line-clamp-2 mb-1 leading-tight">
-                  {drama.bookName.trim()}
+                  {drama.name}
                 </h3>
-                <p className="text-xs text-muted">{drama.playCount}</p>
+                <p className="text-xs text-muted">
+                  {drama.playCount || `${drama.episodes} ep`}
+                </p>
               </Link>
             ))}
           </div>
@@ -197,11 +228,11 @@ const Search = () => {
           <h2 className="text-sm font-semibold mb-3 text-zinc-300">Popular Searches</h2>
           <div className="space-y-3">
             {popularDramas.map((drama, index) => (
-              <Link key={drama.bookId} to={`/watch/${drama.bookId}`} className="card p-3.5 flex gap-3 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
+              <Link key={drama.id} to={`/watch/${drama.id}`} className="card p-3.5 flex gap-3 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
                 <div className="relative flex-shrink-0">
                   <img
                     src={drama.cover}
-                    alt={drama.bookName}
+                    alt={drama.name}
                     className="w-16 h-20 object-cover rounded-lg"
                   />
                   <div className="absolute -top-1 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
@@ -210,12 +241,14 @@ const Search = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-sm mb-1 line-clamp-2">
-                    {drama.bookName.trim()}
+                    {drama.name}
                   </h3>
                   <p className="text-xs text-muted line-clamp-2 mb-2">
-                    {drama.introduction}
+                    {drama.summary}
                   </p>
-                  <p className="text-xs text-muted">{drama.playCount} views</p>
+                  <p className="text-xs text-muted">
+                    {drama.playCount ? `${drama.playCount} views` : `${drama.episodes} episodes`}
+                  </p>
                 </div>
               </Link>
             ))}

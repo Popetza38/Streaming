@@ -1,41 +1,27 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useLanguage } from '../store/language';
+import { usePlatform } from '../store/platform';
 import { useWatchHistory } from '../store/watchHistory';
+import { useWatchData } from '../hooks/useDramas';
 import VideoPlayer from '../components/VideoPlayer';
 import { usePageMeta } from '../hooks/usePageMeta';
-
-interface Chapter {
-  chapterId: string;
-  chapterIndex: number;
-  isCharge: number;
-  isPay: number;
-}
-
-interface WatchData {
-  bookName: string;
-  bookCover: string;
-  videoUrl: string;
-  introduction: string;
-}
 
 const Watch = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [currentChapter, setCurrentChapter] = useState(1);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [watchData, setWatchData] = useState<WatchData | null>(null);
-  const [loading, setLoading] = useState(true);
   const [initialTime, setInitialTime] = useState(0);
-  const { lang } = useLanguage();
+  const { platform } = usePlatform();
   const { save, getItem } = useWatchHistory();
   const saveTimerRef = useRef<ReturnType<typeof setInterval>>();
   const lastTimeRef = useRef({ time: 0, duration: 0 });
 
+  const { watchData, chapters, totalEpisodes, loading } = useWatchData(id, currentChapter);
+
   usePageMeta(
-    watchData ? `${watchData.bookName} EP ${currentChapter}` : 'Loading...',
-    watchData?.introduction
+    watchData ? `${watchData.name} EP ${currentChapter}` : 'Loading...',
+    watchData?.summary
   );
 
   // Resume from watch history on first load
@@ -48,46 +34,19 @@ const Watch = () => {
     }
   }, [id]);
 
-  useEffect(() => {
-    if (!id) return;
-
-    const fetchData = async () => {
-      try {
-        if (chapters.length === 0) {
-          const chaptersResponse = await fetch(`/api/chapters/${id}?lang=${lang}`);
-          const chaptersData = await chaptersResponse.json();
-          if (chaptersData.success) {
-            setChapters(chaptersData.data.chapterList);
-          }
-        }
-
-        const watchResponse = await fetch(`/api/watch/${id}/${currentChapter}?lang=${lang}&direction=1`);
-        const watchDataResponse = await watchResponse.json();
-        if (watchDataResponse.success) {
-          setWatchData(watchDataResponse.data);
-        }
-      } catch (error) {
-        console.error('Failed to fetch watch data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [id, currentChapter, lang]);
-
   // Save progress every 5 seconds
   useEffect(() => {
     saveTimerRef.current = setInterval(() => {
       if (!id || !watchData || lastTimeRef.current.time <= 0) return;
       save({
         bookId: id,
-        bookName: watchData.bookName,
-        cover: watchData.bookCover,
+        bookName: watchData.name,
+        cover: watchData.cover,
         episode: currentChapter,
-        totalEpisodes: chapters.length,
+        totalEpisodes: totalEpisodes,
         videoTime: lastTimeRef.current.time,
         videoDuration: lastTimeRef.current.duration,
+        platform,
       });
     }, 5000);
 
@@ -97,16 +56,17 @@ const Watch = () => {
       if (id && watchData && lastTimeRef.current.time > 0) {
         save({
           bookId: id,
-          bookName: watchData.bookName,
-          cover: watchData.bookCover,
+          bookName: watchData.name,
+          cover: watchData.cover,
           episode: currentChapter,
-          totalEpisodes: chapters.length,
+          totalEpisodes: totalEpisodes,
           videoTime: lastTimeRef.current.time,
           videoDuration: lastTimeRef.current.duration,
+          platform,
         });
       }
     };
-  }, [id, watchData, currentChapter, chapters.length, save]);
+  }, [id, watchData, currentChapter, totalEpisodes, save]);
 
   const handleTimeUpdate = useCallback((time: number, dur: number) => {
     lastTimeRef.current = { time, duration: dur };
@@ -125,10 +85,19 @@ const Watch = () => {
   };
 
   const handleNext = () => {
-    if (currentChapter < chapters.length) {
+    if (currentChapter < totalEpisodes) {
       setInitialTime(0);
       setCurrentChapter(currentChapter + 1);
     }
+  };
+
+  // Build video URL — for ShortMax HLS, we need to proxy through /video
+  const getVideoSrc = () => {
+    if (!watchData?.videoUrl) return '';
+    if (watchData.isHls && platform === 'shortmax') {
+      return `/video?url=${encodeURIComponent(watchData.videoUrl.replace('https://', ''))}`;
+    }
+    return watchData.videoUrl;
   };
 
   if (loading) {
@@ -164,10 +133,10 @@ const Watch = () => {
             <ArrowLeft size={20} className="text-white" />
           </button>
           <h1 className="font-semibold text-white line-clamp-1 flex-1 mx-3 text-sm">
-            {watchData.bookName}
+            {watchData.name}
           </h1>
           <span className="text-xs text-zinc-500 whitespace-nowrap">
-            EP {currentChapter}/{chapters.length}
+            EP {currentChapter}/{totalEpisodes}
           </span>
         </div>
       </div>
@@ -179,14 +148,14 @@ const Watch = () => {
             <div className="w-full lg:h-full lg:flex lg:items-center lg:justify-center">
               <div className="w-full max-w-[500px] mx-auto lg:max-w-none lg:h-full">
                 <VideoPlayer
-                  src={watchData.videoUrl}
-                  poster={watchData.bookCover}
+                  src={getVideoSrc()}
+                  poster={watchData.cover}
                   autoPlay
-                  hasNext={currentChapter < chapters.length}
+                  hasNext={currentChapter < totalEpisodes}
                   hasPrevious={currentChapter > 1}
                   onNext={handleNext}
                   onPrevious={handlePrevious}
-                  episodeInfo={`EP ${currentChapter} / ${chapters.length}`}
+                  episodeInfo={`EP ${currentChapter} / ${totalEpisodes}`}
                   initialTime={initialTime}
                   onTimeUpdate={handleTimeUpdate}
                 />
@@ -197,13 +166,13 @@ const Watch = () => {
           <div className="lg:w-[360px] xl:w-[400px] lg:border-l lg:border-zinc-800 lg:overflow-y-auto lg:flex-shrink-0">
             <div className="p-3 sm:p-4 space-y-4 lg:space-y-5">
               <div>
-                <h2 className="text-base sm:text-lg font-bold mb-1 line-clamp-2">{watchData.bookName}</h2>
+                <h2 className="text-base sm:text-lg font-bold mb-1 line-clamp-2">{watchData.name}</h2>
                 <span className="text-xs sm:text-sm text-zinc-400">
-                  Episode {currentChapter} of {chapters.length}
+                  Episode {currentChapter} of {totalEpisodes}
                 </span>
-                {watchData.introduction && (
+                {watchData.summary && (
                   <p className="text-xs sm:text-sm text-zinc-300 line-clamp-3 mt-2">
-                    {watchData.introduction}
+                    {watchData.summary}
                   </p>
                 )}
               </div>
@@ -219,7 +188,7 @@ const Watch = () => {
                 </button>
                 <button
                   onClick={handleNext}
-                  disabled={currentChapter >= chapters.length}
+                  disabled={currentChapter >= totalEpisodes}
                   className="flex-1 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:opacity-40 disabled:pointer-events-none rounded-xl flex items-center justify-center gap-1.5 transition-colors text-white font-medium text-sm active:scale-[0.97]"
                 >
                   <span>Next</span>
@@ -230,11 +199,11 @@ const Watch = () => {
               <div>
                 <h3 className="font-semibold text-sm mb-2">All Episodes</h3>
                 <div className="grid grid-cols-6 sm:grid-cols-8 lg:grid-cols-6 xl:grid-cols-7 gap-1.5 sm:gap-2 max-h-52 sm:max-h-64 lg:max-h-none overflow-y-auto scrollbar-hide">
-                  {chapters.map((chapter) => {
-                    const episodeNum = chapter.chapterIndex + 1;
+                  {(chapters.length > 0 ? chapters : Array.from({ length: totalEpisodes }, (_, i) => ({ id: String(i), index: i }))).map((chapter) => {
+                    const episodeNum = chapter.index + 1;
                     return (
                       <button
-                        key={chapter.chapterId}
+                        key={chapter.id}
                         onClick={() => handleChapterChange(episodeNum)}
                         className={`aspect-square rounded-lg text-xs sm:text-sm font-medium transition-all active:scale-95 ${currentChapter === episodeNum
                           ? 'bg-red-500 text-white ring-2 ring-red-400/50'

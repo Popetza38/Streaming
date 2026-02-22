@@ -5,7 +5,9 @@ import { useEffect, useCallback } from 'react';
 import HeroBanner from '../components/HeroBanner';
 import Carousel from '../components/Carousel';
 import { useWatchHistory } from '../store/watchHistory';
+import { usePlatform, platforms } from '../store/platform';
 import { usePageMeta } from '../hooks/usePageMeta';
+import type { NormalizedDrama } from '../utils/normalize';
 
 /* ===== Skeleton Loaders ===== */
 const SkeletonBanner = () => <div className="skeleton skeleton-banner" />;
@@ -37,6 +39,9 @@ const ContinueWatchingItem = ({ item }: { item: any }) => {
         <img src={item.cover} alt={item.bookName} loading="lazy" />
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-700">
           <div className="h-full bg-red-500 rounded-r" style={{ width: `${Math.min(progress, 100)}%` }} />
+        </div>
+        <div className="absolute top-1.5 left-1.5 text-[10px] px-1.5 py-0.5 rounded shadow-lg" style={{ backgroundColor: item.platform === 'shortmax' ? '#7c3aed' : '#e50914' }}>
+          {item.platform === 'shortmax' ? '📺' : '🎬'}
         </div>
         <div className="absolute top-1.5 right-1.5 bg-black/70 text-[10px] text-white px-1.5 py-0.5 rounded">
           EP {item.episode}
@@ -70,14 +75,14 @@ function getTimeAgo(ts: number): string {
 }
 
 /* ===== Drama Card (inline) ===== */
-const DramaItem = ({ drama }: { drama: any }) => (
+const DramaItem = ({ drama }: { drama: NormalizedDrama }) => (
   <Link
-    to={`/watch/${drama.bookId}`}
+    to={`/watch/${drama.id}`}
     className="drama-card"
     style={{ width: 150 }}
   >
     <div className="drama-poster">
-      <img src={drama.cover} alt={drama.bookName} loading="lazy" />
+      <img src={drama.cover} alt={drama.name} loading="lazy" />
       {drama.corner && (
         <div
           className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10"
@@ -98,20 +103,20 @@ const DramaItem = ({ drama }: { drama: any }) => (
       </div>
     </div>
     <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-1">
-      {drama.bookName.trim()}
+      {drama.name}
     </h3>
     <div className="flex items-center gap-1 text-xs text-muted">
       <Users size={11} />
-      <span>{drama.playCount}</span>
+      <span>{drama.playCount || `${drama.episodes} ep`}</span>
     </div>
   </Link>
 );
 
 /* ===== Grid Drama Card ===== */
-const GridDramaItem = ({ drama }: { drama: any }) => (
-  <Link to={`/watch/${drama.bookId}`} className="drama-card block">
+const GridDramaItem = ({ drama }: { drama: NormalizedDrama }) => (
+  <Link to={`/watch/${drama.id}`} className="drama-card block">
     <div className="drama-poster">
-      <img src={drama.cover} alt={drama.bookName} loading="lazy" />
+      <img src={drama.cover} alt={drama.name} loading="lazy" />
       {drama.corner && (
         <div
           className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10"
@@ -132,11 +137,11 @@ const GridDramaItem = ({ drama }: { drama: any }) => (
       </div>
     </div>
     <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-1">
-      {drama.bookName.trim()}
+      {drama.name}
     </h3>
     <div className="flex items-center gap-1 text-xs text-muted">
       <Users size={11} />
-      <span>{drama.playCount}</span>
+      <span>{drama.playCount || `${drama.episodes} ep`}</span>
     </div>
   </Link>
 );
@@ -146,6 +151,8 @@ const Home = () => {
   const { dramas: rankDramas, loading: rankLoading } = useRankDramas();
   const { dramas, loading, loadingMore, hasMore, loadMore } = useInfiniteDramas();
   const { history } = useWatchHistory();
+  const { platform } = usePlatform();
+  const currentPlatformInfo = platforms.find(p => p.id === platform);
   usePageMeta();
 
   // Infinite scroll
@@ -170,9 +177,9 @@ const Home = () => {
       )}
 
       {/* ===== Continue Watching ===== */}
-      {history.length > 0 && (
-        <Carousel title="⏯️ Continue Watching">
-          {history.slice(0, 10).map((item) => (
+      {history.filter(h => (h.platform || 'dramabox') === platform).length > 0 && (
+        <Carousel title={`${currentPlatformInfo?.icon || '⏯️'} Continue Watching · ${currentPlatformInfo?.name || 'DramaBox'}`}>
+          {history.filter(h => (h.platform || 'dramabox') === platform).slice(0, 10).map((item) => (
             <ContinueWatchingItem key={item.bookId} item={item} />
           ))}
         </Carousel>
@@ -187,7 +194,7 @@ const Home = () => {
       ) : featuredDramas.length > 1 ? (
         <Carousel title="🎬 For You">
           {featuredDramas.slice(1).map((drama, i) => (
-            <DramaItem key={`fy-${drama.bookId}-${i}`} drama={drama} />
+            <DramaItem key={`fy-${drama.id}-${i}`} drama={drama} />
           ))}
         </Carousel>
       ) : null}
@@ -203,7 +210,7 @@ const Home = () => {
       ) : rankDramas.length > 0 ? (
         <Carousel title="🔥 Trending">
           {rankDramas.map((drama, i) => (
-            <DramaItem key={`rank-${drama.bookId}-${i}`} drama={drama} />
+            <DramaItem key={`rank-${drama.id}-${i}`} drama={drama} />
           ))}
         </Carousel>
       ) : null}
@@ -228,7 +235,7 @@ const Home = () => {
           <>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
               {dramas.map((drama, index) => (
-                <GridDramaItem key={`${drama.bookId}-${index}`} drama={drama} />
+                <GridDramaItem key={`${drama.id}-${index}`} drama={drama} />
               ))}
             </div>
 

@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { Platform } from './platform';
+
 
 export interface HistoryItem {
     bookId: string;
@@ -10,7 +12,9 @@ export interface HistoryItem {
     timestamp: number; // Date.now()
     videoTime: number; // seconds into the video
     videoDuration: number;
+    platform: Platform; // which platform this item belongs to
 }
+
 
 interface WatchHistoryState {
     history: HistoryItem[];

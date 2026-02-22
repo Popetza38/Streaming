@@ -2,16 +2,8 @@ import { TrendingUp, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../store/language';
-
-interface Drama {
-  bookId: string;
-  bookName: string;
-  introduction: string;
-  cover: string;
-  chapterCount: number;
-  playCount: string;
-  tags: string[];
-}
+import { usePlatform } from '../store/platform';
+import { normalizeDramaList, extractList, type NormalizedDrama } from '../utils/normalize';
 
 const rankTabs = [
   { id: 1, name: 'Trending', label: 'Trending' },
@@ -21,18 +13,34 @@ const rankTabs = [
 
 const Rank = () => {
   const [activeTab, setActiveTab] = useState(1);
-  const [dramas, setDramas] = useState<Drama[]>([]);
+  const [dramas, setDramas] = useState<NormalizedDrama[]>([]);
   const [loading, setLoading] = useState(true);
   const { lang } = useLanguage();
+  const { platform } = usePlatform();
 
   useEffect(() => {
     const fetchRankDramas = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/rank/${activeTab}?lang=${lang}`);
+        let url: string;
+        if (platform === 'shortmax') {
+          // ShortMax uses feed endpoint with different types
+          const types = ['vip', 'romance', 'vip'];
+          url = `/api/feed?type=${types[activeTab - 1]}&lang=${lang}&platform=shortmax`;
+        } else {
+          url = `/api/rank/${activeTab}?lang=${lang}&platform=dramabox`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
-        if (data.success) {
-          setDramas(data.data.list);
+
+        if (platform === 'shortmax') {
+          const items = data?.data || [];
+          const list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
+          setDramas(normalizeDramaList(list, platform));
+        } else {
+          const list = extractList(data, platform);
+          setDramas(normalizeDramaList(list, platform));
         }
       } catch (error) {
         console.error('Failed to fetch rank dramas:', error);
@@ -42,7 +50,7 @@ const Rank = () => {
     };
 
     fetchRankDramas();
-  }, [activeTab, lang]);
+  }, [activeTab, lang, platform]);
 
   return (
     <div className="space-y-6 pt-2">
@@ -58,8 +66,8 @@ const Rank = () => {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors whitespace-nowrap active:scale-95 ${activeTab === tab.id
-                ? 'bg-red-500 text-white'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+              ? 'bg-red-500 text-white'
+              : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
               }`}
           >
             {tab.label}
@@ -78,14 +86,14 @@ const Rank = () => {
       {!loading && (
         <div className="space-y-3">
           {dramas.map((drama, index) => (
-            <Link key={drama.bookId} to={`/watch/${drama.bookId}`} className="block">
+            <Link key={drama.id} to={`/watch/${drama.id}`} className="block">
               <div className="card p-3.5 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
                 <div className="flex gap-3">
                   <div className="relative flex-shrink-0">
                     <div className="w-16 h-22 sm:w-14 sm:h-20 rounded-lg overflow-hidden bg-zinc-900">
                       <img
                         src={drama.cover}
-                        alt={drama.bookName}
+                        alt={drama.name}
                         className="w-full h-full object-cover"
                       />
                     </div>
@@ -96,21 +104,21 @@ const Rank = () => {
 
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-sm mb-1 line-clamp-2">
-                      {drama.bookName.trim()}
+                      {drama.name}
                     </h3>
                     <p className="text-xs text-muted mb-2 line-clamp-2">
-                      {drama.introduction}
+                      {drama.summary}
                     </p>
 
                     <div className="flex items-center gap-3 text-xs text-muted mb-2">
                       <div className="flex items-center gap-1">
                         <Users size={11} />
-                        <span>{drama.playCount}</span>
+                        <span>{drama.playCount || 'N/A'}</span>
                       </div>
-                      <span>{drama.chapterCount} ep</span>
+                      <span>{drama.episodes} ep</span>
                     </div>
 
-                    {drama.tags.length > 0 && (
+                    {drama.tags && drama.tags.length > 0 && (
                       <div className="flex gap-1 flex-wrap">
                         {drama.tags.slice(0, 2).map((tag, tagIndex) => (
                           <span key={tagIndex} className="text-xs bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">

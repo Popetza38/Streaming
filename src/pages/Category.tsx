@@ -2,17 +2,8 @@ import { Grid, Users } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../store/language';
-
-interface Drama {
-  bookId: string;
-  bookName: string;
-  cover: string;
-  playCount: string;
-  tagDetails?: Array<{
-    tagId: number;
-    tagName: string;
-  }>;
-}
+import { usePlatform } from '../store/platform';
+import { normalizeDramaList, type NormalizedDrama } from '../utils/normalize';
 
 interface Tag {
   tagId: number;
@@ -21,34 +12,44 @@ interface Tag {
 
 const Category = () => {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
-  const [dramas, setDramas] = useState<Drama[]>([]);
+  const [dramas, setDramas] = useState<NormalizedDrama[]>([]);
   const [categories, setCategories] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const { lang } = useLanguage();
+  const { platform } = usePlatform();
 
   // Fetch popular tags from API
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch(`/api/foryou/1?lang=${lang}`);
-        const data = await response.json();
-        if (data.success && data.data.list.length > 0) {
-          // Extract unique tags from first few dramas
-          const allTags = new Map<number, string>();
-          data.data.list.slice(0, 5).forEach((drama: Drama) => {
-            drama.tagDetails?.forEach(tag => {
-              if (!allTags.has(tag.tagId)) {
-                allTags.set(tag.tagId, tag.tagName);
-              }
+        if (platform === 'shortmax') {
+          // ShortMax doesn't have a classify/tag system — use hardcoded genres
+          const defaultTags: Tag[] = [
+            { tagId: 1, tagName: 'Romance' },
+            { tagId: 2, tagName: 'VIP' },
+            { tagId: 3, tagName: 'Latest' },
+          ];
+          setCategories(defaultTags);
+          setSelectedCategory(defaultTags[0].tagId);
+        } else {
+          const response = await fetch(`/api/foryou/1?lang=${lang}&platform=dramabox`);
+          const data = await response.json();
+          if (data.success && data.data.list.length > 0) {
+            const allTags = new Map<number, string>();
+            data.data.list.slice(0, 5).forEach((drama: any) => {
+              drama.tagDetails?.forEach((tag: any) => {
+                if (!allTags.has(tag.tagId)) {
+                  allTags.set(tag.tagId, tag.tagName);
+                }
+              });
             });
-          });
 
-          const tagArray = Array.from(allTags, ([tagId, tagName]) => ({ tagId, tagName })).slice(0, 6);
-          setCategories(tagArray);
+            const tagArray = Array.from(allTags, ([tagId, tagName]) => ({ tagId, tagName })).slice(0, 6);
+            setCategories(tagArray);
 
-          // Always set first tag when language changes
-          if (tagArray.length > 0) {
-            setSelectedCategory(tagArray[0].tagId);
+            if (tagArray.length > 0) {
+              setSelectedCategory(tagArray[0].tagId);
+            }
           }
         }
       } catch (error) {
@@ -57,7 +58,7 @@ const Category = () => {
     };
 
     fetchCategories();
-  }, [lang]);
+  }, [lang, platform]);
 
   useEffect(() => {
     if (!selectedCategory) return;
@@ -65,10 +66,27 @@ const Category = () => {
     const fetchCategoryDramas = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`/api/classify?lang=${lang}&pageNo=1&pageSize=15&sort=1&tag=${selectedCategory}`);
+        let url: string;
+        if (platform === 'shortmax') {
+          // Map tag IDs to feed types
+          const feedMap: Record<number, string> = { 1: 'romance', 2: 'vip', 3: 'vip' };
+          const type = feedMap[selectedCategory] || 'vip';
+          url = `/api/feed?type=${type}&lang=${lang}&platform=shortmax`;
+        } else {
+          url = `/api/classify?lang=${lang}&pageNo=1&pageSize=15&sort=1&tag=${selectedCategory}&platform=dramabox`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
-        if (data.success) {
-          setDramas(data.data.list);
+
+        if (platform === 'shortmax') {
+          const items = data?.data || [];
+          const list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
+          setDramas(normalizeDramaList(list, platform));
+        } else {
+          if (data.success) {
+            setDramas(normalizeDramaList(data.data.list, platform));
+          }
         }
       } catch (error) {
         console.error('Failed to fetch category dramas:', error);
@@ -78,7 +96,7 @@ const Category = () => {
     };
 
     fetchCategoryDramas();
-  }, [selectedCategory, lang]);
+  }, [selectedCategory, lang, platform]);
 
   return (
     <div className="space-y-6 pt-2">
@@ -94,8 +112,8 @@ const Category = () => {
             key={category.tagId}
             onClick={() => setSelectedCategory(category.tagId)}
             className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors active:scale-95 ${selectedCategory === category.tagId
-                ? 'bg-red-500 text-white'
-                : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+              ? 'bg-red-500 text-white'
+              : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
               }`}
           >
             {category.tagName}
@@ -114,20 +132,20 @@ const Category = () => {
       {!loading && (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
           {dramas.map((drama) => (
-            <Link key={drama.bookId} to={`/watch/${drama.bookId}`} className="group">
+            <Link key={drama.id} to={`/watch/${drama.id}`} className="group">
               <div className="aspect-[3/4] rounded-lg overflow-hidden mb-2">
                 <img
                   src={drama.cover}
-                  alt={drama.bookName}
+                  alt={drama.name}
                   className="w-full h-full object-cover"
                 />
               </div>
               <h3 className="text-sm font-medium line-clamp-2 mb-1">
-                {drama.bookName.trim()}
+                {drama.name}
               </h3>
               <div className="flex items-center gap-1 text-xs text-muted">
                 <Users size={12} />
-                <span>{drama.playCount}</span>
+                <span>{drama.playCount || `${drama.episodes} ep`}</span>
               </div>
             </Link>
           ))}
