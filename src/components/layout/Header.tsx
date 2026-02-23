@@ -1,4 +1,4 @@
-import { Search, Film } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { useLanguage, languages } from '../../store/language'
@@ -19,10 +19,9 @@ export default function Header() {
       <div className="flex items-center justify-between h-full px-4 max-w-5xl mx-auto">
         <Link to="/" className="flex items-center gap-2 group">
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform text-sm"
-            style={{ backgroundColor: activePlatform.color }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform overflow-hidden"
           >
-            <Film size={16} className="text-white" />
+            <img src={activePlatform.logo} alt={activePlatform.name} className="w-full h-full object-contain" />
           </div>
           <span className="text-lg sm:text-xl font-bold text-white tracking-tight">
             {activePlatform.name}
@@ -37,7 +36,7 @@ export default function Header() {
               className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-zinc-800 active:bg-zinc-700 rounded-xl transition-colors text-sm"
               style={{ borderColor: activePlatform.color, borderWidth: 1 }}
             >
-              <span>{activePlatform.icon}</span>
+              <img src={activePlatform.logo} alt={activePlatform.name} className="w-5 h-5 rounded object-contain" />
               <span className="hidden sm:inline text-xs font-medium text-zinc-300">{activePlatform.name}</span>
             </button>
 
@@ -55,7 +54,7 @@ export default function Header() {
                       className={`w-full text-left px-4 py-3 hover:bg-zinc-800 active:bg-zinc-700 transition-colors flex items-center gap-3 text-sm ${platform === p.id ? 'bg-zinc-800' : 'text-white'
                         }`}
                     >
-                      <span className="text-lg">{p.icon}</span>
+                      <img src={p.logo} alt={p.name} className="w-6 h-6 rounded object-contain" />
                       <span className="font-medium">{p.name}</span>
                       {platform === p.id && (
                         <span className="ml-auto" style={{ color: p.color }}>✓</span>

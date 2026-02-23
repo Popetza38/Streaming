@@ -21,6 +21,6 @@ export const usePlatform = create<PlatformState>()(
 );
 
 export const platforms = [
-    { id: 'dramabox' as Platform, name: 'DramaBox', icon: '🎬', color: '#e50914' },
-    { id: 'shortmax' as Platform, name: 'StreamBox', icon: '📺', color: '#7c3aed' },
+    { id: 'dramabox' as Platform, name: 'DramaBox', icon: '🎬', logo: '/logos/dramabox.png', color: '#e50914' },
+    { id: 'shortmax' as Platform, name: 'ShortMax', icon: '📺', logo: '/logos/shortmax.png', color: '#7c3aed' },
 ];
