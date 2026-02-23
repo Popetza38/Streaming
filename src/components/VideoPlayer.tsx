@@ -2,6 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import Hls from 'hls.js';
 import './VideoPlayer.css';
 
+interface QualityLevel {
+    index: number;
+    height: number;
+    width: number;
+    bitrate: number;
+    label: string;
+}
+
 interface VideoPlayerProps {
     src: string;
     poster?: string;
@@ -14,6 +22,8 @@ interface VideoPlayerProps {
     episodeInfo?: string;
     initialTime?: number;
     onTimeUpdate?: (currentTime: number, duration: number) => void;
+    downloadUrl?: string;
+    downloadFileName?: string;
 }
 
 const formatTime = (seconds: number): string => {
@@ -35,6 +45,8 @@ const VideoPlayer = ({
     episodeInfo,
     initialTime = 0,
     onTimeUpdate: onTimeUpdateCb,
+    downloadUrl,
+    downloadFileName,
 }: VideoPlayerProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -57,6 +69,12 @@ const VideoPlayer = ({
     const [tapAction, setTapAction] = useState<'play' | 'pause' | null>(null);
     const [seekIndicator, setSeekIndicator] = useState<{ dir: 'left' | 'right'; key: number } | null>(null);
 
+    // Quality selector state
+    const [qualityLevels, setQualityLevels] = useState<QualityLevel[]>([]);
+    const [currentQuality, setCurrentQuality] = useState(-1); // -1 = auto
+    const [showQualityMenu, setShowQualityMenu] = useState(false);
+    const [isDownloading, setIsDownloading] = useState(false);
+
     // ===== HLS Setup =====
     useEffect(() => {
         const video = videoRef.current;
@@ -77,7 +95,20 @@ const VideoPlayer = ({
             hlsRef.current = hls;
             hls.loadSource(src);
             hls.attachMedia(video);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
+                // Extract quality levels
+                const levels: QualityLevel[] = data.levels.map((level: any, i: number) => ({
+                    index: i,
+                    height: level.height,
+                    width: level.width,
+                    bitrate: level.bitrate,
+                    label: level.height ? `${level.height}p` : `${Math.round(level.bitrate / 1000)}k`,
+                }));
+                // Sort by height descending
+                levels.sort((a, b) => b.height - a.height);
+                setQualityLevels(levels);
+                setCurrentQuality(-1); // auto
+
                 if (initialTime > 0) video.currentTime = initialTime;
                 if (autoPlay) video.play().catch(() => { });
             });
@@ -92,6 +123,7 @@ const VideoPlayer = ({
             });
         } else {
             video.src = src;
+            setQualityLevels([]); // No quality switching for non-HLS
             video.addEventListener('loadedmetadata', () => {
                 if (initialTime > 0) video.currentTime = initialTime;
             }, { once: true });
@@ -348,7 +380,40 @@ const VideoPlayer = ({
 
     const handleOverlayClick = (e: React.MouseEvent) => {
         if ((e.target as HTMLElement).closest('.vp-controls')) return;
+        setShowQualityMenu(false);
         togglePlay();
+    };
+
+    // ===== Quality Switching =====
+    const handleQualityChange = (levelIndex: number) => {
+        const hls = hlsRef.current;
+        if (!hls) return;
+        hls.currentLevel = levelIndex; // -1 = auto
+        setCurrentQuality(levelIndex);
+        setShowQualityMenu(false);
+    };
+
+    const getCurrentQualityLabel = () => {
+        if (currentQuality === -1) return 'Auto';
+        const level = qualityLevels.find(l => l.index === currentQuality);
+        return level ? level.label : 'Auto';
+    };
+
+    // ===== Download =====
+    const handleDownload = async () => {
+        if (!downloadUrl || isDownloading) return;
+        setIsDownloading(true);
+        try {
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = downloadFileName || 'video.mp4';
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } finally {
+            setTimeout(() => setIsDownloading(false), 2000);
+        }
     };
 
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
@@ -385,6 +450,12 @@ const VideoPlayer = ({
     );
     const ForwardIcon = () => (
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.01 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z" /><text x="14" y="16" fontSize="7" fontWeight="bold" textAnchor="middle" fill="currentColor">10</text></svg>
+    );
+    const SettingsIcon = () => (
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z" /></svg>
+    );
+    const DownloadIcon = () => (
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" /></svg>
     );
 
     return (
@@ -507,6 +578,54 @@ const VideoPlayer = ({
 
                         {/* Episode Info */}
                         {episodeInfo && <span className="vp-episode-badge">{episodeInfo}</span>}
+
+                        {/* Quality Selector */}
+                        {qualityLevels.length > 1 && (
+                            <div className="vp-quality-wrap">
+                                <button
+                                    className="vp-btn vp-quality-btn"
+                                    onClick={() => setShowQualityMenu(!showQualityMenu)}
+                                    title="Quality"
+                                >
+                                    <SettingsIcon />
+                                    <span className="vp-quality-label">{getCurrentQualityLabel()}</span>
+                                </button>
+                                {showQualityMenu && (
+                                    <div className="vp-quality-menu">
+                                        <button
+                                            className={`vp-quality-item ${currentQuality === -1 ? 'active' : ''}`}
+                                            onClick={() => handleQualityChange(-1)}
+                                        >
+                                            <span>Auto</span>
+                                            {currentQuality === -1 && <span className="vp-quality-check">✓</span>}
+                                        </button>
+                                        {qualityLevels.map((level) => (
+                                            <button
+                                                key={level.index}
+                                                className={`vp-quality-item ${currentQuality === level.index ? 'active' : ''}`}
+                                                onClick={() => handleQualityChange(level.index)}
+                                            >
+                                                <span>{level.label}</span>
+                                                {level.height >= 720 && <span className="vp-hd-badge">HD</span>}
+                                                {currentQuality === level.index && <span className="vp-quality-check">✓</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Download */}
+                        {downloadUrl && (
+                            <button
+                                className={`vp-btn ${isDownloading ? 'vp-btn-downloading' : ''}`}
+                                onClick={handleDownload}
+                                title="Download"
+                                disabled={isDownloading}
+                            >
+                                <DownloadIcon />
+                            </button>
+                        )}
 
                         {/* Fullscreen */}
                         <button className="vp-btn" onClick={toggleFullscreen} title="Fullscreen (F)">

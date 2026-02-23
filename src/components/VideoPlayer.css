@@ -503,4 +503,99 @@
         width: 22px;
         height: 22px;
     }
+
+    .vp-quality-label {
+        display: none;
+    }
+}
+
+/* ===== Quality Selector ===== */
+.vp-quality-wrap {
+    position: relative;
+}
+
+.vp-quality-btn {
+    display: flex !important;
+    align-items: center;
+    gap: 4px;
+    width: auto !important;
+    padding: 0 6px !important;
+}
+
+.vp-quality-label {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.85);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.vp-quality-menu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    background: rgba(20, 20, 20, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    min-width: 150px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    z-index: 50;
+    animation: vpFadeIn 0.15s ease;
+}
+
+.vp-quality-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    gap: 8px;
+}
+
+.vp-quality-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.vp-quality-item.active {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.vp-quality-check {
+    color: #ef4444;
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.vp-hd-badge {
+    font-size: 9px;
+    font-weight: 700;
+    background: #ef4444;
+    color: white;
+    padding: 1px 4px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+}
+
+/* ===== Download Button ===== */
+.vp-btn-downloading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.vp-btn-downloading svg {
+    animation: vpDownloadPulse 1s ease infinite;
+}
+
+@keyframes vpDownloadPulse {
+    0%, 100% { opacity: 1; transform: translateY(0); }
+    50% { opacity: 0.5; transform: translateY(2px); }
 }

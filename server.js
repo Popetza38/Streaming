@@ -72,6 +72,94 @@ app.get('/video', async (req, res) => {
   }
 })
 
+// ===== Download Endpoint (for HLS → downloadable file) =====
+app.get('/download', async (req, res) => {
+  const videoUrl = req.query.url
+  const filename = req.query.name || 'video.mp4'
+  if (!videoUrl) return res.status(400).send('Missing url')
+
+  const fullUrl = `https://${videoUrl}`
+
+  try {
+    if (videoUrl.includes('.m3u8')) {
+      // Fetch the m3u8 manifest
+      const manifestRes = await axios.get(fullUrl)
+      let manifestText = manifestRes.data
+
+      // If this is a master playlist, pick the highest quality variant
+      if (manifestText.includes('#EXT-X-STREAM-INF')) {
+        const lines = manifestText.split('\n')
+        let bestUrl = ''
+        let bestBandwidth = 0
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim()
+          if (line.startsWith('#EXT-X-STREAM-INF')) {
+            const bwMatch = line.match(/BANDWIDTH=(\d+)/)
+            const bw = bwMatch ? parseInt(bwMatch[1]) : 0
+            const nextLine = lines[i + 1]?.trim()
+            if (nextLine && !nextLine.startsWith('#') && bw > bestBandwidth) {
+              bestBandwidth = bw
+              bestUrl = nextLine
+            }
+          }
+        }
+        if (bestUrl) {
+          const baseUrl = videoUrl.substring(0, videoUrl.lastIndexOf('/') + 1)
+          const variantUrl = bestUrl.startsWith('http')
+            ? bestUrl
+            : `https://${baseUrl}${bestUrl}`
+          const variantRes = await axios.get(variantUrl)
+          manifestText = variantRes.data
+          // Update base for segments
+        }
+      }
+
+      // Parse segment URLs from the media playlist
+      const lines = manifestText.split('\n')
+      const baseUrl = videoUrl.substring(0, videoUrl.lastIndexOf('/') + 1)
+      const segments = []
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith('#')) {
+          if (trimmed.startsWith('http')) {
+            segments.push(trimmed)
+          } else {
+            segments.push(`https://${baseUrl}${trimmed}`)
+          }
+        }
+      }
+
+      if (segments.length === 0) {
+        return res.status(400).send('No segments found in manifest')
+      }
+
+      // Stream segments as downloadable file
+      res.set('Content-Type', 'video/mp2t')
+      res.set('Content-Disposition', `attachment; filename="${filename}"`)
+      res.set('Access-Control-Allow-Origin', '*')
+
+      for (const segUrl of segments) {
+        try {
+          const segRes = await axios.get(segUrl, { responseType: 'arraybuffer' })
+          res.write(Buffer.from(segRes.data))
+        } catch {
+          // Skip failed segments
+        }
+      }
+      res.end()
+    } else {
+      // Direct file download proxy
+      const response = await axios.get(fullUrl, { responseType: 'stream' })
+      res.set('Content-Type', response.headers['content-type'] || 'video/mp4')
+      res.set('Content-Disposition', `attachment; filename="${filename}"`)
+      res.set('Access-Control-Allow-Origin', '*')
+      response.data.pipe(res)
+    }
+  } catch (err) {
+    res.status(500).send('Download error')
+  }
+})
+
 // ===== Unified API Proxy =====
 app.use('/api', async (req, res) => {
   const platform = req.query.platform || 'dramabox'

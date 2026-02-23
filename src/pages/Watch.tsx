@@ -158,6 +158,14 @@ const Watch = () => {
                   episodeInfo={`EP ${currentChapter} / ${totalEpisodes}`}
                   initialTime={initialTime}
                   onTimeUpdate={handleTimeUpdate}
+                  downloadUrl={
+                    watchData.videoUrl
+                      ? watchData.isHls
+                        ? `/download?url=${encodeURIComponent(watchData.videoUrl.replace('https://', ''))}`
+                        : watchData.videoUrl
+                      : undefined
+                  }
+                  downloadFileName={`${watchData.name}_EP${currentChapter}.mp4`}
                 />
               </div>
             </div>

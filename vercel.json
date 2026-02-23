@@ -4,6 +4,14 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/download",
+      "destination": "/api/download"
+    },
+    {
+      "source": "/video",
+      "destination": "/api/video"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/proxy"
     }
