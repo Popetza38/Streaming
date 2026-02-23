@@ -8,6 +8,7 @@ export interface NormalizedDrama {
     episodes: number;
     summary?: string;
     playCount?: string;
+    score?: number;
     tags?: string[];
     corner?: { name: string; color: string };
     rank?: { hotCode: string };
@@ -36,6 +37,7 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
             episodes: raw.episodes ?? 0,
             summary: raw.summary ?? '',
             playCount: raw.playCount ?? '',
+            score: raw.score ?? raw.star ?? undefined,
             tags: raw.tags ?? [],
             corner: raw.corner ?? undefined,
             rank: raw.rank ?? undefined,
@@ -50,6 +52,7 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
         episodes: raw.chapterCount ?? 0,
         summary: raw.introduction ?? '',
         playCount: raw.playCount ?? '',
+        score: raw.score ?? raw.star ?? undefined,
         tags: raw.tags ?? [],
         corner: raw.corner ?? undefined,
         rank: raw.rank ?? undefined,

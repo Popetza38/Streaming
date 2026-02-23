@@ -1,4 +1,4 @@
-import { Play, Users, Clock } from 'lucide-react';
+import { Play, Users, Clock, Star } from 'lucide-react';
 import { useDramas, useInfiniteDramas, useRankDramas } from '../hooks/useDramas';
 import { Link } from 'react-router-dom';
 import { useEffect, useCallback } from 'react';
@@ -74,6 +74,33 @@ function getTimeAgo(ts: number): string {
   return `${days}d ago`;
 }
 
+/* ===== Star Rating (inline) ===== */
+const InlineStarRating = ({ score }: { score: number }) => {
+  const fullStars = Math.floor(score);
+  const hasHalf = score - fullStars >= 0.5;
+  const emptyStars = 5 - fullStars - (hasHalf ? 1 : 0);
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: fullStars }).map((_, i) => (
+        <Star key={`f-${i}`} size={10} className="text-yellow-400 fill-yellow-400" />
+      ))}
+      {hasHalf && (
+        <div className="relative" style={{ width: 10, height: 10 }}>
+          <Star size={10} className="text-zinc-600 absolute inset-0" />
+          <div className="overflow-hidden absolute inset-0" style={{ width: '50%' }}>
+            <Star size={10} className="text-yellow-400 fill-yellow-400" />
+          </div>
+        </div>
+      )}
+      {Array.from({ length: emptyStars }).map((_, i) => (
+        <Star key={`e-${i}`} size={10} className="text-zinc-600" />
+      ))}
+      <span className="text-[10px] text-yellow-400 font-semibold ml-0.5">{score.toFixed(1)}</span>
+    </div>
+  );
+};
+
 /* ===== Drama Card (inline) ===== */
 const DramaItem = ({ drama }: { drama: NormalizedDrama }) => (
   <Link
@@ -105,6 +132,9 @@ const DramaItem = ({ drama }: { drama: NormalizedDrama }) => (
     <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-1">
       {drama.name}
     </h3>
+    {drama.score != null && drama.score > 0 && (
+      <InlineStarRating score={drama.score} />
+    )}
     <div className="flex items-center gap-1 text-xs text-muted">
       <Users size={11} />
       <span>{drama.playCount || `${drama.episodes} ep`}</span>
@@ -139,6 +169,9 @@ const GridDramaItem = ({ drama }: { drama: NormalizedDrama }) => (
     <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-1">
       {drama.name}
     </h3>
+    {drama.score != null && drama.score > 0 && (
+      <InlineStarRating score={drama.score} />
+    )}
     <div className="flex items-center gap-1 text-xs text-muted">
       <Users size={11} />
       <span>{drama.playCount || `${drama.episodes} ep`}</span>

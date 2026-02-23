@@ -1,4 +1,4 @@
-import { Play, Users, Heart } from 'lucide-react';
+import { Play, Star, Users, Heart } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { NormalizedDrama } from '../../utils/normalize';
@@ -7,6 +7,35 @@ interface DramaCardProps {
   drama: NormalizedDrama;
   size?: 'sm' | 'md' | 'lg';
 }
+
+/* ===== Star Rating Component ===== */
+const StarRating = ({ score }: { score: number }) => {
+  const fullStars = Math.floor(score);
+  const hasHalf = score - fullStars >= 0.5;
+  const emptyStars = 5 - fullStars - (hasHalf ? 1 : 0);
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: fullStars }).map((_, i) => (
+        <Star key={`full-${i}`} size={11} className="text-yellow-400 fill-yellow-400" />
+      ))}
+      {hasHalf && (
+        <div className="relative" style={{ width: 11, height: 11 }}>
+          <Star size={11} className="text-zinc-600 absolute inset-0" />
+          <div className="overflow-hidden absolute inset-0" style={{ width: '50%' }}>
+            <Star size={11} className="text-yellow-400 fill-yellow-400" />
+          </div>
+        </div>
+      )}
+      {Array.from({ length: emptyStars }).map((_, i) => (
+        <Star key={`empty-${i}`} size={11} className="text-zinc-600" />
+      ))}
+      <span className="text-[10px] text-yellow-400 font-semibold ml-0.5">
+        {score.toFixed(1)}
+      </span>
+    </div>
+  );
+};
 
 const DramaCard = ({ drama, size = 'md' }: DramaCardProps) => {
   const [isLiked, setIsLiked] = useState(false);
@@ -73,16 +102,22 @@ const DramaCard = ({ drama, size = 'md' }: DramaCardProps) => {
         {/* Info */}
         <div className="mt-2">
           <h3 className="text-sm font-medium line-clamp-2 mb-1">{drama.name}</h3>
-          <div className="flex items-center gap-2 text-xs text-zinc-400">
-            {drama.playCount && (
-              <div className="flex items-center gap-1">
-                <Users size={11} />
-                <span>{drama.playCount}</span>
-              </div>
+          <div className="flex flex-col gap-1">
+            {/* Star Rating */}
+            {drama.score != null && drama.score > 0 && (
+              <StarRating score={drama.score} />
             )}
-            {drama.episodes > 0 && (
-              <span>{drama.episodes} ep</span>
-            )}
+            <div className="flex items-center gap-2 text-xs text-zinc-400">
+              {drama.playCount && (
+                <div className="flex items-center gap-1">
+                  <Users size={11} />
+                  <span>{drama.playCount}</span>
+                </div>
+              )}
+              {drama.episodes > 0 && (
+                <span>{drama.episodes} ep</span>
+              )}
+            </div>
           </div>
         </div>
       </div>

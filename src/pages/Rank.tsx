@@ -1,4 +1,4 @@
-import { TrendingUp, Users } from 'lucide-react';
+import { TrendingUp, Users, Star } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../store/language';
@@ -111,6 +111,12 @@ const Rank = () => {
                     </p>
 
                     <div className="flex items-center gap-3 text-xs text-muted mb-2">
+                      {drama.score != null && drama.score > 0 && (
+                        <div className="flex items-center gap-0.5">
+                          <Star size={11} className="text-yellow-400 fill-yellow-400" />
+                          <span className="text-yellow-400 font-semibold">{drama.score.toFixed(1)}</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-1">
                         <Users size={11} />
                         <span>{drama.playCount || 'N/A'}</span>

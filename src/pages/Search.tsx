@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search as SearchIcon, X } from 'lucide-react';
+import { Search as SearchIcon, X, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../store/language';
 import { usePlatform } from '../store/platform';
@@ -204,6 +204,12 @@ const Search = () => {
                 <h3 className="text-xs font-medium line-clamp-2 mb-1 leading-tight">
                   {drama.name}
                 </h3>
+                {drama.score != null && drama.score > 0 && (
+                  <div className="flex items-center gap-0.5 mb-0.5">
+                    <Star size={10} className="text-yellow-400 fill-yellow-400" />
+                    <span className="text-[10px] text-yellow-400 font-semibold">{drama.score.toFixed(1)}</span>
+                  </div>
+                )}
                 <p className="text-xs text-muted">
                   {drama.playCount || `${drama.episodes} ep`}
                 </p>
@@ -246,9 +252,17 @@ const Search = () => {
                   <p className="text-xs text-muted line-clamp-2 mb-2">
                     {drama.summary}
                   </p>
-                  <p className="text-xs text-muted">
-                    {drama.playCount ? `${drama.playCount} views` : `${drama.episodes} episodes`}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    {drama.score != null && drama.score > 0 && (
+                      <div className="flex items-center gap-0.5">
+                        <Star size={10} className="text-yellow-400 fill-yellow-400" />
+                        <span className="text-[10px] text-yellow-400 font-semibold">{drama.score.toFixed(1)}</span>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted">
+                      {drama.playCount ? `${drama.playCount} views` : `${drama.episodes} episodes`}
+                    </p>
+                  </div>
                 </div>
               </Link>
             ))}
