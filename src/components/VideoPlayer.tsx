@@ -52,8 +52,8 @@ const VideoPlayer = ({
     const containerRef = useRef<HTMLDivElement>(null);
     const hlsRef = useRef<Hls | null>(null);
     const hideTimerRef = useRef<ReturnType<typeof setTimeout>>();
-    const countdownTimerRef = useRef<ReturnType<typeof setInterval>>();
     const seekingRef = useRef(false);
+    const wasFullscreenRef = useRef(false);
 
     const [playing, setPlaying] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
@@ -64,8 +64,7 @@ const VideoPlayer = ({
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [showControls, setShowControls] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
-    const [showCountdown, setShowCountdown] = useState(false);
-    const [countdown, setCountdown] = useState(5);
+    const [transitioning, setTransitioning] = useState(false);
     const [tapAction, setTapAction] = useState<'play' | 'pause' | null>(null);
     const [seekIndicator, setSeekIndicator] = useState<{ dir: 'left' | 'right'; key: number } | null>(null);
 
@@ -81,9 +80,7 @@ const VideoPlayer = ({
         if (!video || !src) return;
 
         setIsLoading(true);
-        setShowCountdown(false);
-        setCountdown(5);
-        if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+        setTransitioning(true);
 
         const isHls = src.includes('.m3u8') || src.includes('m3u8');
 
@@ -111,6 +108,20 @@ const VideoPlayer = ({
 
                 if (initialTime > 0) video.currentTime = initialTime;
                 if (autoPlay) video.play().catch(() => { });
+
+                // Restore fullscreen if it was active before episode change
+                if (wasFullscreenRef.current) {
+                    const el = containerRef.current;
+                    if (el && !document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+                        if (el.requestFullscreen) {
+                            el.requestFullscreen().catch(() => setIsFullscreen(true));
+                        } else if ((el as any).webkitRequestFullscreen) {
+                            (el as any).webkitRequestFullscreen();
+                        } else {
+                            setIsFullscreen(true);
+                        }
+                    }
+                }
             });
             hls.on(Hls.Events.ERROR, (_event, data) => {
                 if (data.fatal) {
@@ -128,6 +139,20 @@ const VideoPlayer = ({
                 if (initialTime > 0) video.currentTime = initialTime;
             }, { once: true });
             if (autoPlay) video.play().catch(() => { });
+
+            // Restore fullscreen for non-HLS too
+            if (wasFullscreenRef.current) {
+                const el = containerRef.current;
+                if (el && !document.fullscreenElement && !(document as any).webkitFullscreenElement) {
+                    if (el.requestFullscreen) {
+                        el.requestFullscreen().catch(() => setIsFullscreen(true));
+                    } else if ((el as any).webkitRequestFullscreen) {
+                        (el as any).webkitRequestFullscreen();
+                    } else {
+                        setIsFullscreen(true);
+                    }
+                }
+            }
         }
 
         return () => {
@@ -158,12 +183,14 @@ const VideoPlayer = ({
             }
         };
         const onWaiting = () => setIsLoading(true);
-        const onCanPlay = () => setIsLoading(false);
-        const onPlaying = () => setIsLoading(false);
+        const onCanPlay = () => { setIsLoading(false); setTransitioning(false); };
+        const onPlaying = () => { setIsLoading(false); setTransitioning(false); };
         const onEnding = () => {
             setPlaying(false);
             if (hasNext) {
-                setShowCountdown(true);
+                // Save fullscreen state before changing episode
+                wasFullscreenRef.current = !!(document.fullscreenElement || (document as any).webkitFullscreenElement) || isFullscreen;
+                onNext?.();
             } else {
                 onEnded?.();
             }
@@ -190,28 +217,7 @@ const VideoPlayer = ({
             video.removeEventListener('playing', onPlaying);
             video.removeEventListener('ended', onEnding);
         };
-    }, [hasNext, onEnded]);
-
-    // ===== Countdown Timer =====
-    useEffect(() => {
-        if (!showCountdown) return;
-
-        countdownTimerRef.current = setInterval(() => {
-            setCountdown(prev => {
-                if (prev <= 1) {
-                    clearInterval(countdownTimerRef.current);
-                    setShowCountdown(false);
-                    onNext?.();
-                    return 5;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        return () => {
-            if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
-        };
-    }, [showCountdown, onNext]);
+    }, [hasNext, hasPrevious, isFullscreen, onEnded, onNext]);
 
     // ===== Auto-hide Controls =====
     const resetHideTimer = useCallback(() => {
@@ -283,11 +289,17 @@ const VideoPlayer = ({
                     break;
                 case 'n':
                     e.preventDefault();
-                    if (hasNext) onNext?.();
+                    if (hasNext) {
+                        wasFullscreenRef.current = !!(document.fullscreenElement || (document as any).webkitFullscreenElement) || isFullscreen;
+                        onNext?.();
+                    }
                     break;
                 case 'p':
                     e.preventDefault();
-                    if (hasPrevious) onPrevious?.();
+                    if (hasPrevious) {
+                        wasFullscreenRef.current = !!(document.fullscreenElement || (document as any).webkitFullscreenElement) || isFullscreen;
+                        onPrevious?.();
+                    }
                     break;
             }
         };
@@ -440,7 +452,6 @@ const VideoPlayer = ({
 
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
     const bufferProgress = duration > 0 ? (buffered / duration) * 100 : 0;
-    const countdownOffset = 251.3 * (1 - countdown / 5);
 
     // ===== SVG Icons =====
     const PlayIcon = () => (
@@ -531,7 +542,7 @@ const VideoPlayer = ({
                 <div className="vp-gradient-bottom" />
 
                 {/* Center Play Button (when paused) */}
-                {!playing && !showCountdown && (
+                {!playing && !transitioning && (
                     <div className="vp-center-play" onClick={(e) => { e.stopPropagation(); togglePlay(); }}>
                         <PlayIcon />
                     </div>
@@ -564,14 +575,14 @@ const VideoPlayer = ({
 
                         {/* Previous */}
                         {hasPrevious && (
-                            <button className="vp-btn" onClick={onPrevious} title="Previous (P)">
+                            <button className="vp-btn" onClick={() => { wasFullscreenRef.current = !!(document.fullscreenElement || (document as any).webkitFullscreenElement) || isFullscreen; onPrevious?.(); }} title="Previous (P)">
                                 <SkipPrevIcon />
                             </button>
                         )}
 
                         {/* Next */}
                         {hasNext && (
-                            <button className="vp-btn" onClick={onNext} title="Next (N)">
+                            <button className="vp-btn" onClick={() => { wasFullscreenRef.current = !!(document.fullscreenElement || (document as any).webkitFullscreenElement) || isFullscreen; onNext?.(); }} title="Next (N)">
                                 <SkipNextIcon />
                             </button>
                         )}
@@ -659,37 +670,11 @@ const VideoPlayer = ({
                 </div>
             </div>
 
-            {/* Auto-Next Countdown Overlay */}
-            {showCountdown && (
-                <div className="vp-countdown-overlay">
-                    <div className="vp-countdown-ring">
-                        <svg viewBox="0 0 90 90">
-                            <circle className="ring-bg" cx="45" cy="45" r="40" />
-                            <circle
-                                className="ring-progress"
-                                cx="45"
-                                cy="45"
-                                r="40"
-                                style={{ strokeDashoffset: countdownOffset }}
-                            />
-                        </svg>
-                        <span className="vp-countdown-number">{countdown}</span>
-                    </div>
-                    <p className="vp-countdown-text">Next episode starting...</p>
-                    <div className="vp-countdown-actions">
-                        <button
-                            className="vp-countdown-btn cancel"
-                            onClick={() => { setShowCountdown(false); if (countdownTimerRef.current) clearInterval(countdownTimerRef.current); }}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            className="vp-countdown-btn next"
-                            onClick={() => { setShowCountdown(false); if (countdownTimerRef.current) clearInterval(countdownTimerRef.current); onNext?.(); }}
-                        >
-                            Play Now
-                        </button>
-                    </div>
+            {/* Smooth Transition Overlay */}
+            {transitioning && (
+                <div className="vp-transition-overlay">
+                    <div className="vp-spinner" />
+                    <p className="vp-transition-text">กำลังโหลดตอนถัดไป...</p>
                 </div>
             )}
         </div>
