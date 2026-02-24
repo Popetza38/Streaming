@@ -31,6 +31,21 @@
     z-index: 9999;
 }
 
+/* iPad / WebKit fullscreen */
+.vp-container:-webkit-full-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    width: 100vw;
+    height: 100vh;
+}
+
+.vp-container:-webkit-full-screen video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
 .vp-container video {
     width: 100%;
     height: 100%;
@@ -596,6 +611,15 @@
 }
 
 @keyframes vpDownloadPulse {
-    0%, 100% { opacity: 1; transform: translateY(0); }
-    50% { opacity: 0.5; transform: translateY(2px); }
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    50% {
+        opacity: 0.5;
+        transform: translateY(2px);
+    }
 }

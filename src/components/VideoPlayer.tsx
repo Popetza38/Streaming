@@ -163,7 +163,7 @@ const VideoPlayer = ({
         const onEnding = () => {
             setPlaying(false);
             if (hasNext) {
-                onNext?.();
+                setShowCountdown(true);
             } else {
                 onEnded?.();
             }
@@ -299,22 +299,44 @@ const VideoPlayer = ({
     // ===== Fullscreen =====
     const toggleFullscreen = useCallback(() => {
         const el = containerRef.current;
+        const video = videoRef.current;
         if (!el) return;
 
-        if (!document.fullscreenElement) {
-            el.requestFullscreen?.().catch(() => {
-                // Fallback: use CSS-based fullscreen
+        const fsEl = document.fullscreenElement || (document as any).webkitFullscreenElement;
+
+        if (!fsEl) {
+            if (el.requestFullscreen) {
+                el.requestFullscreen().catch(() => {
+                    setIsFullscreen(true);
+                });
+            } else if ((el as any).webkitRequestFullscreen) {
+                (el as any).webkitRequestFullscreen();
+            } else if (video && (video as any).webkitEnterFullscreen) {
+                // iOS Safari fallback — native video fullscreen
+                (video as any).webkitEnterFullscreen();
+            } else {
+                // CSS-based fullscreen fallback
                 setIsFullscreen(true);
-            });
+            }
         } else {
-            document.exitFullscreen?.();
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if ((document as any).webkitExitFullscreen) {
+                (document as any).webkitExitFullscreen();
+            }
         }
     }, []);
 
     useEffect(() => {
-        const onFSChange = () => setIsFullscreen(!!document.fullscreenElement);
+        const onFSChange = () => {
+            setIsFullscreen(!!(document.fullscreenElement || (document as any).webkitFullscreenElement));
+        };
         document.addEventListener('fullscreenchange', onFSChange);
-        return () => document.removeEventListener('fullscreenchange', onFSChange);
+        document.addEventListener('webkitfullscreenchange', onFSChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', onFSChange);
+            document.removeEventListener('webkitfullscreenchange', onFSChange);
+        };
     }, []);
 
     // ===== Player Actions =====
@@ -469,6 +491,8 @@ const VideoPlayer = ({
                 ref={videoRef}
                 poster={poster}
                 playsInline
+                // @ts-ignore — webkit prefix for older iOS
+                webkit-playsinline=""
                 preload="auto"
             />
 
