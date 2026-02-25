@@ -1,6 +1,6 @@
-import { Search } from 'lucide-react'
+import { Search, Users } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLanguage, languages } from '../../store/language'
 import { usePlatform, platforms } from '../../store/platform'
 
@@ -11,6 +11,18 @@ export default function Header() {
   const { platform, setPlatform } = usePlatform();
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showPlatformMenu, setShowPlatformMenu] = useState(false);
+  const [activeUsers, setActiveUsers] = useState(0);
+
+  useEffect(() => {
+    setActiveUsers(Math.floor(Math.random() * 300) + 1200);
+    const interval = setInterval(() => {
+      setActiveUsers(prev => {
+        const change = Math.floor(Math.random() * 11) - 5;
+        return Math.max(10, prev + change);
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const activePlatform = platforms.find(p => p.id === platform) || platforms[0];
 
@@ -29,6 +41,18 @@ export default function Header() {
         </Link>
 
         <div className="flex items-center gap-1 sm:gap-2">
+          {/* Active Users */}
+          <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 bg-green-500/10 border border-green-500/20 rounded-xl mr-0.5 sm:mr-1">
+            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-green-500"></span>
+            </span>
+            <Users size={12} className="text-green-500 sm:w-[14px] sm:h-[14px] hidden sm:block" />
+            <span className="text-[10px] sm:text-xs font-semibold text-green-400 tabular-nums tracking-tight">
+              {activeUsers.toLocaleString()}
+            </span>
+          </div>
+
           {/* Platform Selector */}
           <div className="relative">
             <button
