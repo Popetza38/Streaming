@@ -2,6 +2,10 @@ import axios from 'axios';
 import keyDeriver from '../src/utils/keyDeriver.cjs';
 const { deriveKey, decryptSegment, keyCache } = keyDeriver;
 
+// In-Memory API Cache for hot serverless instances
+const apiCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 // Decode obfuscated credentials
 const _d = (s) => Buffer.from(s, 'base64').toString('utf-8');
 
@@ -152,6 +156,13 @@ export default async function handler(req, res) {
 
     try {
       const url = `${SB_API_URL}${pathname}${cleanQuery ? '?' + cleanQuery : ''}`;
+
+      if (apiCache.has(url) && apiCache.get(url).expiry > Date.now()) {
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(apiCache.get(url).data);
+      }
+
       const response = await axios.get(url, {
         headers: {
           Authorization: `Bearer ${SB_TOKEN}`,
@@ -160,7 +171,9 @@ export default async function handler(req, res) {
         timeout: 30000,
       });
 
+      apiCache.set(url, { data: response.data, expiry: Date.now() + CACHE_TTL });
       res.setHeader('Cache-Control', 'public, max-age=300');
+      res.setHeader('X-Cache', 'MISS');
       res.json(response.data);
     } catch (err) {
       res.status(err.response?.status || 500).json({
@@ -180,6 +193,13 @@ export default async function handler(req, res) {
 
     try {
       const url = `${SM_API_URL}${pathname}${cleanQuery ? '?' + cleanQuery : ''}`;
+
+      if (apiCache.has(url) && apiCache.get(url).expiry > Date.now()) {
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(apiCache.get(url).data);
+      }
+
       const response = await axios.get(url, {
         headers: {
           Authorization: `Bearer ${SM_TOKEN}`,
@@ -187,7 +207,9 @@ export default async function handler(req, res) {
         }
       });
 
+      apiCache.set(url, { data: response.data, expiry: Date.now() + CACHE_TTL });
       res.setHeader('Cache-Control', 'public, max-age=300');
+      res.setHeader('X-Cache', 'MISS');
       res.json(response.data);
     } catch (err) {
       res.status(err.response?.status || 500).json({
@@ -210,6 +232,13 @@ export default async function handler(req, res) {
 
     try {
       const url = `${DB_API_URL}${pathname}${cleanQuery ? '?' + cleanQuery : ''}`;
+
+      if (apiCache.has(url) && apiCache.get(url).expiry > Date.now()) {
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(apiCache.get(url).data);
+      }
+
       const response = await axios.get(url, {
         headers: {
           Authorization: `Bearer ${DB_TOKEN}`,
@@ -217,6 +246,9 @@ export default async function handler(req, res) {
         }
       });
 
+      apiCache.set(url, { data: response.data, expiry: Date.now() + CACHE_TTL });
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.setHeader('X-Cache', 'MISS');
       res.json(response.data);
     } catch (err) {
       res.status(err.response?.status || 500).json({

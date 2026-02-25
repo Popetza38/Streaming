@@ -142,6 +142,41 @@ const DramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: stri
   </Link>
 );
 
+/* ===== Ranked Drama Card (Top 10) ===== */
+const RankedDramaItem = ({ drama, platform, rank }: { drama: NormalizedDrama; platform: string; rank: number }) => (
+  <Link
+    to={`/watch/${drama.id}?p=${platform}`}
+    className="drama-card relative"
+    style={{ width: 140 }}
+  >
+    {/* Large Rank Number */}
+    <div className="absolute -left-3 bottom-8 text-[80px] font-black leading-none tracking-tighter text-white drop-shadow-2xl z-20"
+      style={{ WebkitTextStroke: '2px rgba(255,255,255,0.2)', color: 'transparent', userSelect: 'none' }}>
+      {rank}
+    </div>
+
+    <div className="drama-poster ml-6">
+      <img src={drama.cover} alt={drama.name} loading="lazy" />
+      {drama.corner && (
+        <div
+          className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10"
+          style={{ backgroundColor: drama.corner.color }}
+        >
+          {drama.corner.name}
+        </div>
+      )}
+      <div className="drama-overlay">
+        <div className="drama-overlay-play">
+          <Play size={18} className="text-white ml-0.5" />
+        </div>
+      </div>
+    </div>
+    <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-1 ml-6">
+      {drama.name}
+    </h3>
+  </Link>
+);
+
 /* ===== Grid Drama Card ===== */
 const GridDramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: string }) => (
   <Link to={`/watch/${drama.id}?p=${platform}`} className="drama-card block">
@@ -169,12 +204,27 @@ const GridDramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: 
     <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-1">
       {drama.name}
     </h3>
-    {drama.score != null && drama.score > 0 && (
-      <InlineStarRating score={drama.score} />
+    {drama.tags && drama.tags.length > 0 && (
+      <div className="flex flex-wrap gap-1 mb-1.5 h-3.5 overflow-hidden">
+        {drama.tags.slice(0, 2).map((tag, idx) => {
+          const label = typeof tag === 'string' ? tag : (tag as any)?.tag_name ?? '';
+          if (!label) return null;
+          return (
+            <span key={idx} className="text-[10px] px-1 font-medium bg-zinc-800 text-zinc-300 rounded leading-tight">
+              {label}
+            </span>
+          );
+        })}
+      </div>
     )}
-    <div className="flex items-center gap-1 text-xs text-muted">
-      <Users size={11} />
-      <span>{drama.playCount || `${drama.episodes} ep`}</span>
+    <div className="flex items-center justify-between">
+      {drama.score != null && drama.score > 0 ? (
+        <InlineStarRating score={drama.score} />
+      ) : <div />}
+      <div className="flex items-center gap-1 text-[10px] text-muted">
+        <Users size={10} />
+        <span>{drama.playCount || `${drama.episodes} ep`}</span>
+      </div>
     </div>
   </Link>
 );
@@ -241,9 +291,9 @@ const Home = () => {
           <SkeletonCards />
         </div>
       ) : rankDramas.length > 0 ? (
-        <Carousel title="🔥 Trending">
-          {rankDramas.map((drama, i) => (
-            <DramaItem key={`rank-${drama.id}-${i}`} drama={drama} platform={platform} />
+        <Carousel title="🔥 Top 10 Trending">
+          {rankDramas.slice(0, 10).map((drama, i) => (
+            <RankedDramaItem key={`rank-${drama.id}-${i}`} drama={drama} platform={platform} rank={i + 1} />
           ))}
         </Carousel>
       ) : null}

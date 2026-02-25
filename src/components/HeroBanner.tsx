@@ -43,7 +43,7 @@ const HeroBanner = ({ dramas, interval = 5000 }: HeroBannerProps) => {
                         key={drama.id}
                         className={`hero-slide ${idx === current ? 'active' : ''}`}
                     >
-                        <img src={drama.cover} alt={drama.name} />
+                        <img src={drama.cover} alt={drama.name} loading="lazy" />
                         <div className="hero-gradient" />
                         <div className="hero-content">
                             {drama.corner && (

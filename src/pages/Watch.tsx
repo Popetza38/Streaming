@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { usePlatform } from '../store/platform';
 import type { Platform } from '../store/platform';
@@ -36,7 +36,8 @@ const Watch = () => {
 
   usePageMeta(
     watchData ? `${watchData.name} EP ${currentChapter}` : 'Loading...',
-    watchData?.summary
+    watchData?.summary,
+    watchData?.cover
   );
 
   // Resume from watch history on first load
@@ -103,6 +104,35 @@ const Watch = () => {
     if (currentChapter < totalEpisodes) {
       setInitialTime(0);
       setCurrentChapter(currentChapter + 1);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!watchData) return;
+    const shareData = {
+      title: `${watchData.name} - DramaBox`,
+      text: `Watch ${watchData.name} Episode ${currentChapter} online!`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: 'Link copied to clipboard',
+          showConfirmButton: false,
+          timer: 2000,
+          background: '#18181b',
+          color: '#fff'
+        });
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
     }
   };
 
@@ -208,10 +238,21 @@ const Watch = () => {
           <div className="lg:w-[360px] xl:w-[400px] lg:border-l lg:border-zinc-800 lg:overflow-y-auto lg:flex-shrink-0">
             <div className="p-3 sm:p-4 space-y-4 lg:space-y-5">
               <div>
-                <h2 className="text-base sm:text-lg font-bold mb-1 line-clamp-2">{watchData.name}</h2>
-                <span className="text-xs sm:text-sm text-zinc-400">
-                  Episode {currentChapter} of {totalEpisodes}
-                </span>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold mb-1 line-clamp-2">{watchData.name}</h2>
+                    <span className="text-xs sm:text-sm text-zinc-400">
+                      Episode {currentChapter} of {totalEpisodes}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleShare}
+                    className="p-2 sm:p-2.5 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-xl transition-all flex-shrink-0 mt-1"
+                    title="Share"
+                  >
+                    <Share2 size={18} className="text-zinc-300" />
+                  </button>
+                </div>
                 {watchData.summary && (
                   <p className="text-xs sm:text-sm text-zinc-300 line-clamp-3 mt-2">
                     {watchData.summary}
@@ -262,7 +303,7 @@ const Watch = () => {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 
