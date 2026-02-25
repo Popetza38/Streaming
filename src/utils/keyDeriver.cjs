@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const Module = require("module");
 
 // Browser shims for Node.js
 if (typeof globalThis.navigator === "undefined") {
@@ -30,22 +31,19 @@ if (typeof globalThis.crypto === "undefined") {
 
 // Patch the module to expose XGSecretKey
 const pluginPath = require.resolve("@byteplus/veplayer/plugin/hlsEncrypt.js");
-const patchedPath = pluginPath.replace("hlsEncrypt.js", "_hlsEncrypt_patched.js");
 
-// Create patched version if not exists
-try {
-    fs.accessSync(patchedPath);
-} catch {
-    let code = fs.readFileSync(pluginPath, "utf8");
-    code = code.replace(
-        "e.XGSecretKey=cg,e.aes4js=Ym,e.util=dv",
-        'e.XGSecretKey=cg,e.aes4js=Ym,e.util=dv;if(typeof globalThis!=="undefined"){globalThis.__XGSecretKey=cg}'
-    );
-    fs.writeFileSync(patchedPath, code);
-}
+// Don't write to disk on Vercel! It will cause EROFS (Read-only filesystem) error.
+// Compile and evaluate the patched module in memory.
+let code = fs.readFileSync(pluginPath, "utf8");
+code = code.replace(
+    "e.XGSecretKey=cg,e.aes4js=Ym,e.util=dv",
+    'e.XGSecretKey=cg,e.aes4js=Ym,e.util=dv;if(typeof globalThis!=="undefined"){globalThis.__XGSecretKey=cg}'
+);
 
-// Load the patched plugin
-require(patchedPath);
+const m = new Module(pluginPath, module);
+m.filename = pluginPath;
+m.paths = Module._nodeModulePaths(path.dirname(pluginPath));
+m._compile(code, pluginPath);
 const XGSecretKey = globalThis.__XGSecretKey;
 
 // Cache: kid → keyString

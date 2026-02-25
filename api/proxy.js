@@ -1,7 +1,6 @@
 import axios from 'axios';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const { deriveKey, decryptSegment, keyCache } = require('../src/utils/keyDeriver.cjs');
+import keyDeriver from '../src/utils/keyDeriver.cjs';
+const { deriveKey, decryptSegment, keyCache } = keyDeriver;
 
 // Decode obfuscated credentials
 const _d = (s) => Buffer.from(s, 'base64').toString('utf-8');
