@@ -193,7 +193,7 @@ const Search = () => {
           </h2>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
             {results.map((drama) => (
-              <Link key={drama.id} to={`/watch/${drama.id}`} className="group">
+              <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}`} className="group">
                 <div className="aspect-[3/4] rounded-lg overflow-hidden mb-2 bg-zinc-900">
                   <img
                     src={drama.cover}
@@ -234,7 +234,7 @@ const Search = () => {
           <h2 className="text-sm font-semibold mb-3 text-zinc-300">Popular Searches</h2>
           <div className="space-y-3">
             {popularDramas.map((drama, index) => (
-              <Link key={drama.id} to={`/watch/${drama.id}`} className="card p-3.5 flex gap-3 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
+              <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}`} className="card p-3.5 flex gap-3 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
                 <div className="relative flex-shrink-0">
                   <img
                     src={drama.cover}

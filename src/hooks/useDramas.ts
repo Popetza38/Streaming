@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../store/language';
 import { usePlatform } from '../store/platform';
+import type { Platform } from '../store/platform';
 import {
   normalizeDramaList,
   normalizeWatchData,
@@ -28,9 +29,20 @@ export const useDramas = () => {
     setLoading(true);
     setDramas([]);
 
-    const path = platform === 'shortmax' ? '/api/foryou' : '/api/foryou/1';
+    let path: string;
     const params: Record<string, string | number> = { lang };
-    if (platform === 'shortmax') params.page = 1;
+
+    if (platform === 'shortbox') {
+      path = '/api/list';
+      params.page = 1;
+      params.page_size = 30;
+      params.languages = lang;
+    } else if (platform === 'shortmax') {
+      path = '/api/foryou';
+      params.page = 1;
+    } else {
+      path = '/api/foryou/1';
+    }
 
     fetch(apiUrl(path, platform, params))
       .then(res => res.json())
@@ -66,7 +78,12 @@ export const useInfiniteDramas = () => {
       let path: string;
       const params: Record<string, string | number> = { lang };
 
-      if (platform === 'shortmax') {
+      if (platform === 'shortbox') {
+        path = '/api/list';
+        params.page = pageNum;
+        params.page_size = 30;
+        params.languages = lang;
+      } else if (platform === 'shortmax') {
         path = '/api/foryou';
         params.page = pageNum;
       } else {
@@ -85,7 +102,11 @@ export const useInfiniteDramas = () => {
         setDramas(normalized);
       }
 
-      setHasMore(platform === 'shortmax' ? list.length >= 20 : list.length >= 50);
+      setHasMore(
+        platform === 'shortbox' ? list.length >= 20 :
+          platform === 'shortmax' ? list.length >= 20 :
+            list.length >= 50
+      );
     } catch (error) {
       console.error('Failed to fetch dramas:', error);
     } finally {
@@ -122,15 +143,28 @@ export const useRankDramas = () => {
     setLoading(true);
     setDramas([]);
 
-    const path = platform === 'shortmax' ? '/api/foryou' : '/api/rank/1';
+    let path: string;
     const params: Record<string, string | number> = { lang: 'in' };
-    if (platform === 'shortmax') params.page = 2;
+
+    if (platform === 'shortbox') {
+      path = '/api/new-list';
+      params.page = 1;
+      params.page_size = 30;
+      params.languages = 'en';
+    } else if (platform === 'shortmax') {
+      path = '/api/foryou';
+      params.page = 2;
+    } else {
+      path = '/api/rank/1';
+    }
 
     fetch(apiUrl(path, platform, params))
       .then(res => res.json())
       .then(data => {
         let list: any[];
-        if (platform === 'shortmax') {
+        if (platform === 'shortbox') {
+          list = extractList(data, platform);
+        } else if (platform === 'shortmax') {
           const items = data?.data || [];
           list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
         } else {
@@ -163,7 +197,13 @@ export const useSearchDramas = (query: string) => {
         let path: string;
         const params: Record<string, string | number> = { lang: 'in' };
 
-        if (platform === 'shortmax') {
+        if (platform === 'shortbox') {
+          path = '/api/search';
+          params.q = query;
+          params.page = 1;
+          params.page_size = 30;
+          params.languages = 'en';
+        } else if (platform === 'shortmax') {
           path = '/api/search';
           params.q = query;
         } else {
@@ -190,13 +230,14 @@ export const useSearchDramas = (query: string) => {
 };
 
 /* ===== Watch data (video playback) ===== */
-export const useWatchData = (id: string | undefined, episode: number) => {
+export const useWatchData = (id: string | undefined, episode: number, platformOverride?: string) => {
   const [watchData, setWatchData] = useState<NormalizedWatchData | null>(null);
   const [chapters, setChapters] = useState<NormalizedChapter[]>([]);
   const [totalEpisodes, setTotalEpisodes] = useState(0);
   const [loading, setLoading] = useState(true);
   const { lang } = useLanguage();
-  const { platform } = usePlatform();
+  const { platform: storePlatform } = usePlatform();
+  const platform = (platformOverride || storePlatform) as Platform;
 
   useEffect(() => {
     if (!id) return;
@@ -204,7 +245,101 @@ export const useWatchData = (id: string | undefined, episode: number) => {
 
     const fetchData = async () => {
       try {
-        if (platform === 'shortmax') {
+        if (platform === 'shortbox') {
+          // ShortBox: /detail/{id} + /episodes/{id}
+          const [detailRes, epsRes] = await Promise.all([
+            fetch(apiUrl(`/api/detail/${id}`, platform, { languages: lang })),
+            fetch(apiUrl(`/api/episodes/${id}`, platform, { index: 1, count: 200, languages: lang })),
+          ]);
+
+          const detailData = await detailRes.json();
+          const epsData = await epsRes.json();
+
+          // ShortBox API responses may be double-nested: { data: { code, data: { ... } } }
+          const detailInner = detailData?.data?.data ?? detailData?.data ?? detailData;
+          const epsInner = epsData?.data?.data ?? epsData?.data ?? epsData;
+
+          const drama = detailInner;
+          const episodes = epsInner?.episodes || [];
+          const epCount = episodes.length || drama?.total || 0;
+          setTotalEpisodes(epCount);
+          setChapters(normalizeChapters({ data: epsInner }, platform, epCount));
+
+          // Find the episode to play
+          const ep = episodes[episode - 1];
+          if (ep) {
+            const pil = ep.play_info_list || [];
+            let playUrl = '', playAuth = '', kid = '';
+            let qualities: any[] = [];
+
+            if (pil.length > 0) {
+              const sorted = [...pil].sort((a: any, b: any) => (b.Height || 0) - (a.Height || 0));
+              const best = sorted[0];
+              playUrl = best.MainPlayUrl || best.BackupPlayUrl || '';
+              playAuth = best.PlayAuth || '';
+              kid = best.PlayAuthId || '';
+              qualities = sorted.map((q: any) => ({
+                url: q.MainPlayUrl || q.BackupPlayUrl || '',
+                playAuth: q.PlayAuth || '',
+                kid: q.PlayAuthId || '',
+                height: q.Height || 0,
+                label: q.Height ? `${q.Height}p` : 'Default',
+              }));
+            }
+
+            // If no play_info_list, try play_auth_token
+            if (!playUrl && ep.play_auth_token) {
+              try {
+                const token = JSON.parse(atob(ep.play_auth_token));
+                const vodUrl = 'https://vod.byteplusapi.com?' + token.GetPlayInfoToken;
+                const r = await fetch(`/sb-proxy?url=${encodeURIComponent(vodUrl)}`);
+                const vod = await r.json();
+                const playInfoList = vod?.Result?.PlayInfoList || [];
+                if (playInfoList.length > 0) {
+                  const sorted = [...playInfoList].sort((a: any, b: any) => (b.Height || 0) - (a.Height || 0));
+                  const best = sorted[0];
+                  playUrl = best.MainPlayUrl || best.BackupPlayUrl || '';
+                  playAuth = best.PlayAuth || '';
+                  kid = best.PlayAuthId || '';
+                  qualities = sorted.map((q: any) => ({
+                    url: q.MainPlayUrl || q.BackupPlayUrl || '',
+                    playAuth: q.PlayAuth || '',
+                    kid: q.PlayAuthId || '',
+                    height: q.Height || 0,
+                    label: q.Height ? `${q.Height}p` : 'Default',
+                  }));
+                }
+              } catch (e) {
+                console.error('VOD fetch error:', e);
+              }
+            }
+
+            // Derive key and build proxy URL
+            let finalUrl = playUrl;
+            if (playAuth && kid) {
+              try {
+                await fetch(`/derive-key?playAuth=${encodeURIComponent(playAuth)}&kid=${encodeURIComponent(kid)}`);
+                finalUrl = `/sb-proxy?url=${encodeURIComponent(playUrl)}&kid=${encodeURIComponent(kid)}`;
+              } catch (e) {
+                console.error('Key derivation failed:', e);
+              }
+            } else if (playUrl) {
+              finalUrl = `/sb-proxy?url=${encodeURIComponent(playUrl)}`;
+            }
+
+            const imgUrl = drama?.cover_image || drama?.cover_image_thumb?.thumb || '';
+
+            setWatchData(normalizeWatchData({
+              name: drama?.title ?? '',
+              cover: imgUrl ? `/img?url=${encodeURIComponent(imgUrl)}` : '',
+              videoUrl: finalUrl,
+              summary: drama?.desc ?? '',
+              playAuth,
+              kid,
+              qualities,
+            }, platform));
+          }
+        } else if (platform === 'shortmax') {
           // ShortMax: path-based endpoints: /detail/{code} and /play/{code}?ep=X
           const [detailRes, playRes] = await Promise.all([
             fetch(apiUrl(`/api/detail/${id}`, platform, { lang })),

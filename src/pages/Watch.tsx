@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { usePlatform } from '../store/platform';
+import type { Platform } from '../store/platform';
 import { useWatchHistory } from '../store/watchHistory';
 import { useWatchData } from '../hooks/useDramas';
 import VideoPlayer from '../components/VideoPlayer';
@@ -10,14 +11,27 @@ import { usePageMeta } from '../hooks/usePageMeta';
 const Watch = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [currentChapter, setCurrentChapter] = useState(1);
   const [initialTime, setInitialTime] = useState(0);
-  const { platform } = usePlatform();
+  const { platform, setPlatform } = usePlatform();
   const { save, getItem } = useWatchHistory();
   const saveTimerRef = useRef<ReturnType<typeof setInterval>>();
   const lastTimeRef = useRef({ time: 0, duration: 0 });
 
-  const { watchData, chapters, totalEpisodes, loading } = useWatchData(id, currentChapter);
+  // Compute effective platform synchronously from URL param
+  const validPlatforms: Platform[] = ['dramabox', 'shortmax', 'shortbox'];
+  const urlPlatform = searchParams.get('p') as Platform | null;
+  const effectivePlatform = (urlPlatform && validPlatforms.includes(urlPlatform)) ? urlPlatform : platform;
+
+  // Sync URL platform to store (so other components stay consistent)
+  useEffect(() => {
+    if (effectivePlatform !== platform) {
+      setPlatform(effectivePlatform);
+    }
+  }, [effectivePlatform]);
+
+  const { watchData, chapters, totalEpisodes, loading } = useWatchData(id, currentChapter, effectivePlatform);
 
   usePageMeta(
     watchData ? `${watchData.name} EP ${currentChapter}` : 'Loading...',
@@ -91,9 +105,14 @@ const Watch = () => {
     }
   };
 
-  // Build video URL — for ShortMax HLS, we need to proxy through /video
+  // Build video URL — platform-specific proxying
   const getVideoSrc = () => {
     if (!watchData?.videoUrl) return '';
+    // ShortBox: URLs already proxied through /sb-proxy in useDramas
+    if (platform === 'shortbox') {
+      return watchData.videoUrl;
+    }
+    // ShortMax: proxy HLS through /video
     if (watchData.isHls && platform === 'shortmax') {
       return `/video?url=${encodeURIComponent(watchData.videoUrl.replace('https://', ''))}`;
     }

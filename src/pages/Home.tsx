@@ -31,7 +31,7 @@ const ContinueWatchingItem = ({ item }: { item: any }) => {
 
   return (
     <Link
-      to={`/watch/${item.bookId}`}
+      to={`/watch/${item.bookId}?p=${item.platform || 'dramabox'}`}
       className="drama-card flex-shrink-0"
       style={{ width: 140 }}
     >
@@ -102,9 +102,9 @@ const InlineStarRating = ({ score }: { score: number }) => {
 };
 
 /* ===== Drama Card (inline) ===== */
-const DramaItem = ({ drama }: { drama: NormalizedDrama }) => (
+const DramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: string }) => (
   <Link
-    to={`/watch/${drama.id}`}
+    to={`/watch/${drama.id}?p=${platform}`}
     className="drama-card"
     style={{ width: 150 }}
   >
@@ -143,8 +143,8 @@ const DramaItem = ({ drama }: { drama: NormalizedDrama }) => (
 );
 
 /* ===== Grid Drama Card ===== */
-const GridDramaItem = ({ drama }: { drama: NormalizedDrama }) => (
-  <Link to={`/watch/${drama.id}`} className="drama-card block">
+const GridDramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: string }) => (
+  <Link to={`/watch/${drama.id}?p=${platform}`} className="drama-card block">
     <div className="drama-poster">
       <img src={drama.cover} alt={drama.name} loading="lazy" />
       {drama.corner && (
@@ -227,7 +227,7 @@ const Home = () => {
       ) : featuredDramas.length > 1 ? (
         <Carousel title="🎬 For You">
           {featuredDramas.slice(1).map((drama, i) => (
-            <DramaItem key={`fy-${drama.id}-${i}`} drama={drama} />
+            <DramaItem key={`fy-${drama.id}-${i}`} drama={drama} platform={platform} />
           ))}
         </Carousel>
       ) : null}
@@ -243,7 +243,7 @@ const Home = () => {
       ) : rankDramas.length > 0 ? (
         <Carousel title="🔥 Trending">
           {rankDramas.map((drama, i) => (
-            <DramaItem key={`rank-${drama.id}-${i}`} drama={drama} />
+            <DramaItem key={`rank-${drama.id}-${i}`} drama={drama} platform={platform} />
           ))}
         </Carousel>
       ) : null}
@@ -268,7 +268,7 @@ const Home = () => {
           <>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
               {dramas.map((drama, index) => (
-                <GridDramaItem key={`${drama.id}-${index}`} drama={drama} />
+                <GridDramaItem key={`${drama.id}-${index}`} drama={drama} platform={platform} />
               ))}
             </div>
 

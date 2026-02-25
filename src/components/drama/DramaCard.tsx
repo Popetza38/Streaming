@@ -2,6 +2,7 @@ import { Play, Star, Users, Heart } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { NormalizedDrama } from '../../utils/normalize';
+import { usePlatform } from '../../store/platform';
 
 interface DramaCardProps {
   drama: NormalizedDrama;
@@ -40,6 +41,7 @@ const StarRating = ({ score }: { score: number }) => {
 const DramaCard = ({ drama, size = 'md' }: DramaCardProps) => {
   const [isLiked, setIsLiked] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const { platform } = usePlatform();
 
   const sizeClasses = {
     sm: 'w-36',
@@ -48,7 +50,7 @@ const DramaCard = ({ drama, size = 'md' }: DramaCardProps) => {
   };
 
   return (
-    <Link to={`/watch/${drama.id}`} className={`group cursor-pointer ${sizeClasses[size]} flex-shrink-0`}>
+    <Link to={`/watch/${drama.id}?p=${platform}`} className={`group cursor-pointer ${sizeClasses[size]} flex-shrink-0`}>
       <div className="relative overflow-hidden rounded-xl hover:scale-105 transition-all duration-300">
         {/* Image */}
         <div className="relative aspect-[3/4]">

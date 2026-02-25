@@ -15,8 +15,37 @@ const DB_TOKEN = _d(process.env.AUTH_TOKEN_E || '') || process.env.AUTH_TOKEN ||
 const SM_API_URL = process.env.SM_API_URL || 'https://captain.sapimu.au/shortmax/api/v1'
 const SM_TOKEN = process.env.SM_AUTH_TOKEN || ''
 
+// ===== ShortBox credentials =====
+const SB_API_URL = process.env.SB_API_URL || 'https://captain.sapimu.au/shortbox/api'
+const SB_TOKEN = process.env.SB_API_TOKEN || ''
+
 const DB_ALLOWED_PATHS = ['/foryou/', '/new/', '/rank/', '/search/', '/suggest/', '/classify', '/chapters/', '/watch/']
 const SM_ALLOWED_PATHS = ['/foryou', '/detail/', '/play/', '/search', '/feed/', '/home']
+const SB_ALLOWED_PATHS = ['/list', '/new-list', '/hot-search', '/detail/', '/episodes/', '/search']
+
+// Lazy load keyDeriver only when needed
+let deriveKey, decryptSegment, keyCache
+let keyDeriverLoaded = false
+const loadKeyDeriver = async () => {
+  if (!keyDeriverLoaded) {
+    try {
+      const module = await import('./src/utils/keyDeriver.js')
+      deriveKey = module.deriveKey
+      decryptSegment = module.decryptSegment
+      keyCache = module.keyCache
+      keyDeriverLoaded = true
+      console.log('[KeyDeriver] Loaded successfully')
+    } catch (error) {
+      console.error('[KeyDeriver] Load failed:', error.message)
+      return {
+        deriveKey: async () => { throw new Error('KeyDeriver not available') },
+        decryptSegment: () => { throw new Error('KeyDeriver not available') },
+        keyCache: new Map(),
+      }
+    }
+  }
+  return { deriveKey, decryptSegment, keyCache }
+}
 
 // CORS
 app.use((req, res, next) => {
@@ -25,6 +54,102 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type')
   if (req.method === 'OPTIONS') return res.sendStatus(200)
   next()
+})
+
+// ===== Image Proxy (for ShortBox cover images) =====
+app.get('/img', async (req, res) => {
+  const url = req.query.url
+  if (!url) return res.status(400).send('Missing url')
+  try {
+    const response = await axios.get(url, {
+      responseType: 'arraybuffer',
+      timeout: 10000,
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    })
+    const contentType = response.headers['content-type'] || 'image/jpeg'
+    res.set('Content-Type', contentType)
+    res.set('Cache-Control', 'public, max-age=86400')
+    res.set('Access-Control-Allow-Origin', '*')
+    res.send(Buffer.from(response.data))
+  } catch (error) {
+    res.status(502).send('Image fetch failed')
+  }
+})
+
+// ===== Derive DRM Key (for ShortBox) =====
+app.get('/derive-key', async (req, res) => {
+  const { playAuth, kid } = req.query
+  if (!playAuth || !kid) return res.status(400).json({ error: 'Missing playAuth or kid' })
+  try {
+    const { deriveKey } = await loadKeyDeriver()
+    const keyStr = await deriveKey(playAuth, kid)
+    res.json({ kid, keyLength: keyStr.length, cached: true })
+  } catch (e) {
+    console.error('[Derive Key Error]', e.message)
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// ===== ShortBox HLS Proxy with DRM decryption =====
+app.get('/sb-proxy', async (req, res) => {
+  const url = req.query.url
+  const kid = req.query.kid
+  if (!url) return res.status(400).send('Missing url')
+  try {
+    const r = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 })
+    const ct = r.headers['content-type'] || 'application/octet-stream'
+    res.set('Content-Type', ct)
+    res.set('Access-Control-Allow-Origin', '*')
+
+    // Handle m3u8 playlists: remove EXT-X-KEY, rewrite URLs
+    if (ct.includes('mpegurl') || url.endsWith('.m3u8')) {
+      let text = Buffer.from(r.data).toString('utf-8')
+      const base = url.substring(0, url.lastIndexOf('/') + 1)
+
+      // Remove EXT-X-KEY line (we decrypt server-side)
+      text = text.replace(/^#EXT-X-KEY:.*$/gm, '')
+
+      // Rewrite .ts segments through proxy with kid for decryption
+      text = text.replace(/^(?!#)(.+\.ts.*)$/gm, (line) => {
+        const full = line.startsWith('http') ? line : base + line
+        let proxyUrl = '/sb-proxy?url=' + encodeURIComponent(full)
+        if (kid) proxyUrl += '&kid=' + encodeURIComponent(kid)
+        return proxyUrl
+      })
+      // Rewrite sub-m3u8 URLs
+      text = text.replace(/^(?!#)(.+\.m3u8.*)$/gm, (line) => {
+        const full = line.startsWith('http') ? line : base + line
+        let proxyUrl = '/sb-proxy?url=' + encodeURIComponent(full)
+        if (kid) proxyUrl += '&kid=' + encodeURIComponent(kid)
+        return proxyUrl
+      })
+      res.set('Content-Type', 'application/vnd.apple.mpegurl')
+      return res.send(text)
+    }
+
+    // Handle TS segments: decrypt if key is cached
+    if (url.includes('.ts') && kid) {
+      const { keyCache, decryptSegment } = await loadKeyDeriver()
+      if (keyCache.has(kid)) {
+        const buffer = Buffer.from(r.data)
+        if (buffer[0] !== 0x47) {
+          try {
+            const decrypted = decryptSegment(buffer, keyCache.get(kid))
+            res.set('Content-Type', 'video/mp2t')
+            return res.send(decrypted)
+          } catch {
+            // Decryption failed, serve as-is
+          }
+        }
+        res.set('Content-Type', 'video/mp2t')
+        return res.send(buffer)
+      }
+    }
+
+    res.send(Buffer.from(r.data))
+  } catch (e) {
+    res.status(502).send(e.message)
+  }
 })
 
 // ===== Video Proxy (for ShortMax HLS streams) =====
@@ -110,7 +235,6 @@ app.get('/download', async (req, res) => {
             : `https://${baseUrl}${bestUrl}`
           const variantRes = await axios.get(variantUrl)
           manifestText = variantRes.data
-          // Update base for segments
         }
       }
 
@@ -169,7 +293,28 @@ app.use('/api', async (req, res) => {
   const params = { ...req.query }
   delete params.platform
 
-  if (platform === 'shortmax') {
+  if (platform === 'shortbox') {
+    // ShortBox routing
+    if (!SB_ALLOWED_PATHS.some(p => path.startsWith(p))) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    try {
+      const response = await axios.get(`${SB_API_URL}${path}`, {
+        params,
+        headers: {
+          Authorization: `Bearer ${SB_TOKEN}`,
+          'User-Agent': 'ShortBox-App/1.0'
+        },
+        timeout: 30000,
+      })
+
+      res.set('Cache-Control', 'public, max-age=300')
+      res.json(response.data)
+    } catch (err) {
+      res.status(err.response?.status || 500).json({ error: err.message })
+    }
+  } else if (platform === 'shortmax') {
     // ShortMax routing
     if (!SM_ALLOWED_PATHS.some(p => path.startsWith(p))) {
       return res.status(403).json({ error: 'Forbidden' })

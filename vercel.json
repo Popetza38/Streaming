@@ -8,8 +8,16 @@
       "destination": "/api/download"
     },
     {
-      "source": "/video",
-      "destination": "/api/video"
+      "source": "/sb-proxy",
+      "destination": "/api/proxy"
+    },
+    {
+      "source": "/derive-key",
+      "destination": "/api/proxy"
+    },
+    {
+      "source": "/img",
+      "destination": "/api/proxy"
     },
     {
       "source": "/api/:path*",

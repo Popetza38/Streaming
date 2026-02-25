@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Play, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { NormalizedDrama } from '../utils/normalize';
+import { usePlatform } from '../store/platform';
 
 interface HeroBannerProps {
     dramas: NormalizedDrama[];
@@ -12,6 +13,7 @@ const HeroBanner = ({ dramas, interval = 5000 }: HeroBannerProps) => {
     const [current, setCurrent] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
     const timerRef = useRef<ReturnType<typeof setInterval>>();
+    const { platform } = usePlatform();
     const items = dramas.slice(0, 5);
 
     useEffect(() => {
@@ -55,14 +57,15 @@ const HeroBanner = ({ dramas, interval = 5000 }: HeroBannerProps) => {
                             <h2 className="hero-title">{drama.name}</h2>
                             <p className="hero-desc">{drama.summary}</p>
                             <div className="hero-meta">
-                                {drama.tags?.slice(0, 3).map(tag => (
-                                    <span key={tag} className="hero-tag">{tag}</span>
-                                ))}
+                                {drama.tags?.slice(0, 3).map((tag, i) => {
+                                    const label = typeof tag === 'string' ? tag : (tag as any)?.tag_name ?? '';
+                                    return label ? <span key={`${label}-${i}`} className="hero-tag">{label}</span> : null;
+                                })}
                                 {drama.playCount && (
                                     <span className="hero-plays">▶ {drama.playCount}</span>
                                 )}
                             </div>
-                            <Link to={`/watch/${drama.id}`} className="hero-play-btn">
+                            <Link to={`/watch/${drama.id}?p=${platform}`} className="hero-play-btn">
                                 <Play size={18} />
                                 <span>Watch Now</span>
                             </Link>

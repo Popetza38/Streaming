@@ -86,7 +86,7 @@ const Rank = () => {
       {!loading && (
         <div className="space-y-3">
           {dramas.map((drama, index) => (
-            <Link key={drama.id} to={`/watch/${drama.id}`} className="block">
+            <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}`} className="block">
               <div className="card p-3.5 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
                 <div className="flex gap-3">
                   <div className="relative flex-shrink-0">
