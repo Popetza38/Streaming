@@ -22,9 +22,11 @@ const Search = () => {
       try {
         let url: string;
         if (platform === 'shortmax') {
-          url = `/api/feed?type=vip&lang=${lang}&platform=shortmax`;
+          url = `/api/foryou?lang=${lang}&platform=shortmax`;
+        } else if (platform === 'flextv') {
+          url = `/api/tabs/popular?lang=${lang}&platform=flextv`;
         } else {
-          url = `/api/rank/2?lang=${lang}&platform=dramabox`;
+          url = `/api/rank/2?lang=${lang}&platform=${platform}`;
         }
 
         const response = await fetch(url);
@@ -35,9 +37,8 @@ const Search = () => {
           const list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
           setPopularDramas(normalizeDramaList(list, platform));
         } else {
-          if (data.success) {
-            setPopularDramas(normalizeDramaList(data.data.list, platform));
-          }
+          const list = extractList(data, platform);
+          setPopularDramas(normalizeDramaList(list, platform));
         }
       } catch (error) {
         console.error('Failed to fetch popular dramas:', error);
@@ -61,7 +62,7 @@ const Search = () => {
     }
 
     try {
-      const response = await fetch(`/api/suggest/${encodeURIComponent(q)}?lang=${lang}&platform=dramabox`);
+      const response = await fetch(`/api/suggest/${encodeURIComponent(q)}?lang=${lang}&platform=${platform}`);
       const data = await response.json();
       if (data.success) {
         setSuggestions(data.data.suggestList.slice(0, 5));
@@ -82,8 +83,10 @@ const Search = () => {
       let url: string;
       if (platform === 'shortmax') {
         url = `/api/search?q=${encodeURIComponent(q)}&lang=${lang}&platform=shortmax`;
+      } else if (platform === 'flextv') {
+        url = `/api/search?q=${encodeURIComponent(q)}&lang=${lang}&platform=flextv`;
       } else {
-        url = `/api/search/${encodeURIComponent(q)}/1?lang=${lang}&pageSize=20&platform=dramabox`;
+        url = `/api/search/${encodeURIComponent(q)}/1?lang=${lang}&pageSize=20&platform=${platform}`;
       }
 
       const response = await fetch(url);

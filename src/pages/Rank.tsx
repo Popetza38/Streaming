@@ -24,11 +24,12 @@ const Rank = () => {
       try {
         let url: string;
         if (platform === 'shortmax') {
-          // ShortMax uses feed endpoint with different types
-          const types = ['vip', 'romance', 'vip'];
-          url = `/api/feed?type=${types[activeTab - 1]}&lang=${lang}&platform=shortmax`;
+          // ShortMax uses foryou endpoint for lists as feed is unavailable
+          url = `/api/foryou?page=${activeTab}&lang=${lang}&platform=shortmax`;
+        } else if (platform === 'flextv') {
+          url = `/api/tabs/popular?lang=${lang}&platform=flextv`;
         } else {
-          url = `/api/rank/${activeTab}?lang=${lang}&platform=dramabox`;
+          url = `/api/rank/${activeTab}?lang=${lang}&platform=${platform}`;
         }
 
         const response = await fetch(url);

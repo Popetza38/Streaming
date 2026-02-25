@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../store/language';
 import { usePlatform } from '../store/platform';
-import { normalizeDramaList, type NormalizedDrama } from '../utils/normalize';
+import { normalizeDramaList, extractList, type NormalizedDrama } from '../utils/normalize';
 
 interface Tag {
   tagId: number;
@@ -32,14 +32,19 @@ const Category = () => {
           setCategories(defaultTags);
           setSelectedCategory(defaultTags[0].tagId);
         } else {
-          const response = await fetch(`/api/foryou/1?lang=${lang}&platform=dramabox`);
+          const path = platform === 'flextv' ? '/api/tabs/popular' : '/api/foryou/1';
+          const response = await fetch(`${path}?lang=${lang}&platform=${platform}`);
           const data = await response.json();
-          if (data.success && data.data.list.length > 0) {
+          const list = extractList(data, platform);
+          if (list.length > 0) {
             const allTags = new Map<number, string>();
-            data.data.list.slice(0, 5).forEach((drama: any) => {
-              drama.tagDetails?.forEach((tag: any) => {
-                if (!allTags.has(tag.tagId)) {
-                  allTags.set(tag.tagId, tag.tagName);
+            list.slice(0, 5).forEach((drama: any) => {
+              const tags = platform === 'flextv' ? drama.tag_list : drama.tagDetails;
+              tags?.forEach((tag: any) => {
+                const tagId = typeof tag === 'string' ? tag : tag.tagId;
+                const tagName = typeof tag === 'string' ? tag : tag.tagName;
+                if (tagId && !allTags.has(tagId)) {
+                  allTags.set(tagId, tagName);
                 }
               });
             });
@@ -68,12 +73,12 @@ const Category = () => {
       try {
         let url: string;
         if (platform === 'shortmax') {
-          // Map tag IDs to feed types
-          const feedMap: Record<number, string> = { 1: 'romance', 2: 'vip', 3: 'vip' };
-          const type = feedMap[selectedCategory] || 'vip';
-          url = `/api/feed?type=${type}&lang=${lang}&platform=shortmax`;
+          // ShortMax uses foryou or home for lists as feed is unavailable
+          url = `/api/foryou?page=${selectedCategory}&lang=${lang}&platform=shortmax`;
+        } else if (platform === 'flextv') {
+          url = `/api/tabs/popular?lang=${lang}&platform=flextv`;
         } else {
-          url = `/api/classify?lang=${lang}&pageNo=1&pageSize=15&sort=1&tag=${selectedCategory}&platform=dramabox`;
+          url = `/api/classify?lang=${lang}&pageNo=1&pageSize=15&sort=1&tag=${selectedCategory}&platform=${platform}`;
         }
 
         const response = await fetch(url);
@@ -84,9 +89,8 @@ const Category = () => {
           const list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
           setDramas(normalizeDramaList(list, platform));
         } else {
-          if (data.success) {
-            setDramas(normalizeDramaList(data.data.list, platform));
-          }
+          const list = extractList(data, platform);
+          setDramas(normalizeDramaList(list, platform));
         }
       } catch (error) {
         console.error('Failed to fetch category dramas:', error);

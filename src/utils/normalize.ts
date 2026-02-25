@@ -70,6 +70,22 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
         };
     }
 
+    if (platform === 'flextv') {
+        const imgUrl = raw.cover || '';
+        return {
+            id: String(raw.series_id ?? raw.id ?? ''),
+            name: raw.series_name ?? '',
+            cover: imgUrl,
+            episodes: raw.last_series_no ?? 0,
+            summary: raw.description ?? '',
+            playCount: raw.watch_num ?? '',
+            score: undefined,
+            tags: (raw.tag_list ?? []).map((t: any) => typeof t === 'string' ? t : t?.tag_name ?? ''),
+            corner: undefined,
+            rank: undefined,
+        };
+    }
+
     // dramabox
     return {
         id: raw.bookId ?? '',
@@ -101,6 +117,23 @@ export function extractList(data: any, platform: Platform): any[] {
     }
     if (platform === 'shortmax') {
         return data?.data || [];
+    }
+    if (platform === 'flextv') {
+        // FlexTV: { code: 0, data: { list: [...] } } or { data: [...] } or { data: { floor: [{ series_list: [...] }] } }
+        const dataObj = data?.data || data;
+        if (Array.isArray(dataObj)) return dataObj;
+        if (dataObj?.list && Array.isArray(dataObj.list)) return dataObj.list;
+
+        // Handle nested floor structure: data.floor[0].series_list
+        if (dataObj?.floor && Array.isArray(dataObj.floor)) {
+            const list: any[] = [];
+            dataObj.floor.forEach((f: any) => {
+                const sl = f.series_list || f.list || [];
+                if (Array.isArray(sl)) list.push(...sl);
+            });
+            return list;
+        }
+        return [];
     }
     // dramabox wraps in { success, data: { list } }
     return data?.data?.list || [];
@@ -164,6 +197,17 @@ export function normalizeWatchData(data: any, platform: Platform): NormalizedWat
         };
     }
 
+    if (platform === 'flextv') {
+        const videoUrl = data?.video_url || '';
+        return {
+            name: data?.series_name ?? data?.name ?? '',
+            cover: data?.cover ?? '',
+            videoUrl,
+            summary: data?.description ?? data?.summary ?? '',
+            isHls: videoUrl.includes('.m3u8'),
+        };
+    }
+
     // dramabox
     return {
         name: data?.bookName ?? '',
@@ -195,6 +239,23 @@ export function normalizeChapters(data: any, platform: Platform, totalEpisodes?:
 
     if (platform === 'shortmax') {
         // ShortMax doesn't have a chapters endpoint; generate from total
+        const count = totalEpisodes ?? 0;
+        return Array.from({ length: count }, (_, i) => ({
+            id: String(i + 1),
+            index: i,
+        }));
+    }
+
+    if (platform === 'flextv') {
+        // FlexTV: episodes come from /episodes endpoint
+        const episodes = data?.data || data || [];
+        if (Array.isArray(episodes) && episodes.length > 0) {
+            return episodes.map((ep: any) => ({
+                id: String(ep.id),
+                index: ep.series_no - 1,
+            }));
+        }
+        // Fallback: generate from total
         const count = totalEpisodes ?? 0;
         return Array.from({ length: count }, (_, i) => ({
             id: String(i + 1),

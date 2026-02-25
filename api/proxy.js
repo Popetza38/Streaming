@@ -21,9 +21,14 @@ const SM_TOKEN = process.env.SM_AUTH_TOKEN || '';
 const SB_API_URL = process.env.SB_API_URL || 'https://captain.sapimu.au/shortbox/api';
 const SB_TOKEN = process.env.SB_API_TOKEN || '';
 
+// FlexTV
+const FLEX_API_URL = process.env.FLEX_API_URL || 'https://captain.sapimu.au/flextv/api/v1';
+const FLEX_TOKEN = process.env.FLEX_API_TOKEN || '';
+
 const DB_ALLOWED_PATHS = ['/foryou/', '/new/', '/rank/', '/search/', '/suggest/', '/classify', '/chapters/', '/watch/'];
-const SM_ALLOWED_PATHS = ['/foryou', '/detail/', '/play/', '/search', '/feed/', '/home'];
+const SM_ALLOWED_PATHS = ['/foryou', '/detail', '/play', '/search', '/feed', '/home'];
 const SB_ALLOWED_PATHS = ['/list', '/new-list', '/hot-search', '/detail/', '/episodes/', '/search'];
+const FLEX_ALLOWED_PATHS = ['/tabs', '/series', '/play', '/search', '/languages'];
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -138,6 +143,45 @@ export default async function handler(req, res) {
     } catch (err) {
       return res.status(502).end('Image fetch failed');
     }
+  }
+
+  // 4. FlexTV routing
+  if (platform === 'flextv') {
+    if (!FLEX_ALLOWED_PATHS.some(p => pathname.startsWith(p))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (!FLEX_TOKEN) {
+      return res.status(500).json({ error: 'FlexTV token not configured.' });
+    }
+
+    try {
+      const url = `${FLEX_API_URL}${pathname}${queryString ? '?' + queryString : ''}`;
+
+      if (apiCache.has(url) && apiCache.get(url).expiry > Date.now()) {
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(apiCache.get(url).data);
+      }
+
+      const response = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${FLEX_TOKEN}`,
+          'User-Agent': 'FlexTV-App/1.0'
+        }
+      });
+
+      apiCache.set(url, { data: response.data, expiry: Date.now() + CACHE_TTL });
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.setHeader('X-Cache', 'MISS');
+      res.json(response.data);
+    } catch (err) {
+      res.status(err.response?.status || 500).json({
+        error: 'FlexTV API request failed',
+        details: err.message
+      });
+    }
+    return;
   }
 
   params.delete('platform');

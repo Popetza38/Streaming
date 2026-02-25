@@ -44,6 +44,8 @@ export const useDramas = () => {
     } else if (platform === 'shortmax') {
       path = '/api/foryou';
       params.page = 1;
+    } else if (platform === 'flextv') {
+      path = '/api/tabs/popular';
     } else {
       path = '/api/foryou/1';
     }
@@ -90,6 +92,9 @@ export const useInfiniteDramas = () => {
       } else if (platform === 'shortmax') {
         path = '/api/foryou';
         params.page = pageNum;
+      } else if (platform === 'flextv') {
+        path = '/api/tabs/new';
+        params.page_no = pageNum;
       } else {
         path = `/api/new/${pageNum}`;
         params.pageSize = 50;
@@ -158,6 +163,8 @@ export const useRankDramas = () => {
     } else if (platform === 'shortmax') {
       path = '/api/foryou';
       params.page = 2;
+    } else if (platform === 'flextv') {
+      path = '/api/tabs/popular';
     } else {
       path = '/api/rank/1';
     }
@@ -171,6 +178,8 @@ export const useRankDramas = () => {
         } else if (platform === 'shortmax') {
           const items = data?.data || [];
           list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
+        } else if (platform === 'flextv') {
+          list = extractList(data, platform);
         } else {
           list = data?.data?.list || [];
         }
@@ -208,6 +217,9 @@ export const useSearchDramas = (query: string) => {
           params.page_size = 30;
           params.languages = 'en';
         } else if (platform === 'shortmax') {
+          path = '/api/search';
+          params.q = query;
+        } else if (platform === 'flextv') {
           path = '/api/search';
           params.q = query;
         } else {
@@ -383,6 +395,36 @@ export const useWatchData = (id: string | undefined, episode: number, platformOv
             video: playData?.data?.video,
           };
           setWatchData(normalizeWatchData(watchRaw, platform));
+        } else if (platform === 'flextv') {
+          const cacheKey = `${platform}_${id}_${lang}`;
+          let detailInner, epsInner;
+
+          if (detailCache[cacheKey] && chaptersCache[cacheKey]) {
+            detailInner = detailCache[cacheKey];
+            epsInner = chaptersCache[cacheKey];
+          } else {
+            const [detailRes, epsRes] = await Promise.all([
+              fetch(apiUrl(`/api/series/${id}`, platform, { lang })),
+              fetch(apiUrl(`/api/series/${id}/episodes`, platform, { lang })),
+            ]);
+            detailInner = (await detailRes.json())?.data;
+            epsInner = (await epsRes.json())?.data;
+            detailCache[cacheKey] = detailInner;
+            chaptersCache[cacheKey] = epsInner;
+          }
+
+          const episodes = Array.isArray(epsInner) ? epsInner : (epsInner?.list || []);
+          setTotalEpisodes(detailInner?.max_series_no || episodes.length || 0);
+          setChapters(normalizeChapters(epsInner, platform));
+
+          // Find the episode ID to fetch play URL
+          const targetEp = episodes.find((e: any) => e.series_no === episode) || episodes[episode - 1];
+          if (targetEp) {
+            const playRes = await fetch(apiUrl(`/api/play/${id}/${targetEp.id}`, platform, { lang }));
+            const playData = await playRes.json();
+            const watchRaw = { ...detailInner, ...playData?.data };
+            setWatchData(normalizeWatchData(watchRaw, platform));
+          }
         } else {
           // DramaBox: fetch chapters list + watch data
           if (chapters.length === 0) {

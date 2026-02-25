@@ -21,6 +21,8 @@ function apiProxyPlugin(): Plugin {
   let SM_TOKEN = ''
   let SB_API_URL = ''
   let SB_TOKEN = ''
+  let FLEX_API_URL = ''
+  let FLEX_API_TOKEN = ''
 
   async function handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     const reqUrl = req.url || ''
@@ -46,6 +48,12 @@ function apiProxyPlugin(): Plugin {
       headers = {
         'Authorization': `Bearer ${SM_TOKEN}`,
         'User-Agent': 'ShortMax-App/1.0',
+      }
+    } else if (platform === 'flextv') {
+      targetUrl = `${FLEX_API_URL}${apiPath}${queryString}`
+      headers = {
+        'Authorization': `Bearer ${FLEX_API_TOKEN}`,
+        'User-Agent': 'FlexTV-App/1.0',
       }
     } else {
       targetUrl = `${DB_API_URL}${apiPath}${queryString}`
@@ -245,7 +253,9 @@ function apiProxyPlugin(): Plugin {
       SM_TOKEN = env.SM_AUTH_TOKEN || ''
       SB_API_URL = env.SB_API_URL || ''
       SB_TOKEN = env.SB_API_TOKEN || ''
-      console.log('[api-proxy] DB:', DB_API_URL ? '✅' : '❌', 'SM:', SM_API_URL ? '✅' : '❌', 'SB:', SB_API_URL ? '✅' : '❌')
+      FLEX_API_URL = env.FLEX_API_URL || ''
+      FLEX_API_TOKEN = env.FLEX_API_TOKEN || ''
+      console.log('[api-proxy] DB:', DB_API_URL ? '✅' : '❌', 'SM:', SM_API_URL ? '✅' : '❌', 'SB:', SB_API_URL ? '✅' : '❌', 'FLEX:', FLEX_API_URL ? '✅' : '❌')
     },
     configureServer(server) {
       server.middlewares.use((
