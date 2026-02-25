@@ -12,6 +12,10 @@ import {
   type NormalizedChapter,
 } from '../utils/normalize';
 
+// In-memory cache for details and chapters to speed up episode transitions
+const detailCache: Record<string, any> = {};
+const chaptersCache: Record<string, any> = {};
+
 /* ===== Helper: build API url with platform query param ===== */
 function apiUrl(path: string, platform: string, extra: Record<string, string | number> = {}) {
   const params = new URLSearchParams({ platform, ...Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, String(v)])) });
@@ -246,18 +250,29 @@ export const useWatchData = (id: string | undefined, episode: number, platformOv
     const fetchData = async () => {
       try {
         if (platform === 'shortbox') {
-          // ShortBox: /detail/{id} + /episodes/{id}
-          const [detailRes, epsRes] = await Promise.all([
-            fetch(apiUrl(`/api/detail/${id}`, platform, { languages: lang })),
-            fetch(apiUrl(`/api/episodes/${id}`, platform, { index: 1, count: 200, languages: lang })),
-          ]);
+          const cacheKey = `${platform}_${id}_${lang}`;
+          let detailInner, epsInner;
 
-          const detailData = await detailRes.json();
-          const epsData = await epsRes.json();
+          if (detailCache[cacheKey] && chaptersCache[cacheKey]) {
+            detailInner = detailCache[cacheKey];
+            epsInner = chaptersCache[cacheKey];
+          } else {
+            // ShortBox: /detail/{id} + /episodes/{id}
+            const [detailRes, epsRes] = await Promise.all([
+              fetch(apiUrl(`/api/detail/${id}`, platform, { languages: lang })),
+              fetch(apiUrl(`/api/episodes/${id}`, platform, { index: 1, count: 200, languages: lang })),
+            ]);
 
-          // ShortBox API responses may be double-nested: { data: { code, data: { ... } } }
-          const detailInner = detailData?.data?.data ?? detailData?.data ?? detailData;
-          const epsInner = epsData?.data?.data ?? epsData?.data ?? epsData;
+            const detailData = await detailRes.json();
+            const epsData = await epsRes.json();
+
+            // ShortBox API responses may be double-nested: { data: { code, data: { ... } } }
+            detailInner = detailData?.data?.data ?? detailData?.data ?? detailData;
+            epsInner = epsData?.data?.data ?? epsData?.data ?? epsData;
+
+            detailCache[cacheKey] = detailInner;
+            chaptersCache[cacheKey] = epsInner;
+          }
 
           const drama = detailInner;
           const episodes = epsInner?.episodes || [];
@@ -340,16 +355,22 @@ export const useWatchData = (id: string | undefined, episode: number, platformOv
             }, platform));
           }
         } else if (platform === 'shortmax') {
-          // ShortMax: path-based endpoints: /detail/{code} and /play/{code}?ep=X
-          const [detailRes, playRes] = await Promise.all([
-            fetch(apiUrl(`/api/detail/${id}`, platform, { lang })),
-            fetch(apiUrl(`/api/play/${id}`, platform, { ep: episode, lang })),
-          ]);
+          const cacheKey = `${platform}_${id}_${lang}`;
 
-          const detailData = await detailRes.json();
+          let drama;
+          if (detailCache[cacheKey]) {
+            drama = detailCache[cacheKey];
+          } else {
+            const detailRes = await fetch(apiUrl(`/api/detail/${id}`, platform, { lang }));
+            const detailData = await detailRes.json();
+            drama = detailData?.data;
+            detailCache[cacheKey] = drama;
+          }
+
+          // ShortMax: path-based endpoints: /play/{code}?ep=X
+          const playRes = await fetch(apiUrl(`/api/play/${id}`, platform, { ep: episode, lang }));
           const playData = await playRes.json();
 
-          const drama = detailData?.data;
           const epCount = drama?.episodes || 0;
           setTotalEpisodes(epCount);
           setChapters(normalizeChapters(null, platform, epCount));
@@ -365,8 +386,17 @@ export const useWatchData = (id: string | undefined, episode: number, platformOv
         } else {
           // DramaBox: fetch chapters list + watch data
           if (chapters.length === 0) {
-            const chaptersRes = await fetch(apiUrl(`/api/chapters/${id}`, platform, { lang }));
-            const chaptersData = await chaptersRes.json();
+            const cacheKey = `${platform}_${id}_${lang}`;
+            let chaptersData;
+
+            if (chaptersCache[cacheKey]) {
+              chaptersData = chaptersCache[cacheKey];
+            } else {
+              const chaptersRes = await fetch(apiUrl(`/api/chapters/${id}`, platform, { lang }));
+              chaptersData = await chaptersRes.json();
+              chaptersCache[cacheKey] = chaptersData;
+            }
+
             const normalizedChapters = normalizeChapters(chaptersData, platform);
             setChapters(normalizedChapters);
             setTotalEpisodes(normalizedChapters.length);

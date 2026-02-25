@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import Swal from 'sweetalert2';
 import { usePlatform } from '../store/platform';
 import type { Platform } from '../store/platform';
 import { useWatchHistory } from '../store/watchHistory';
@@ -119,15 +120,29 @@ const Watch = () => {
     return watchData.videoUrl;
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full"></div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (loading) {
+      Swal.fire({
+        title: 'กำลังโหลดข้อมูล...',
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        background: 'transparent',
+        color: '#fff',
+        backdrop: 'rgba(0,0,0,0.8)',
+        target: (document.fullscreenElement as HTMLElement) || document.body,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+    } else {
+      if (Swal.isVisible() && Swal.getTitle()?.textContent === 'กำลังโหลดข้อมูล...') {
+        Swal.close();
+      }
+    }
+  }, [loading]);
 
   if (!watchData) {
+    if (loading) return null;
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-center">

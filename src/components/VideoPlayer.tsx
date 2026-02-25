@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Hls from 'hls.js';
+import Swal from 'sweetalert2';
 import './VideoPlayer.css';
 
 interface QualityLevel {
@@ -121,6 +122,7 @@ const VideoPlayer = ({
                             setIsFullscreen(true);
                         }
                     }
+                    wasFullscreenRef.current = false;
                 }
             });
             hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -152,6 +154,7 @@ const VideoPlayer = ({
                         setIsFullscreen(true);
                     }
                 }
+                wasFullscreenRef.current = false;
             }
         }
 
@@ -437,6 +440,19 @@ const VideoPlayer = ({
     const handleDownload = async () => {
         if (!downloadUrl || isDownloading) return;
         setIsDownloading(true);
+        const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            target: (containerRef.current || document.body) as HTMLElement
+        });
+        Toast.fire({
+            icon: 'info',
+            title: 'กำลังเริ่มดาวน์โหลด...'
+        });
+
         try {
             const link = document.createElement('a');
             link.href = downloadUrl;
@@ -490,6 +506,27 @@ const VideoPlayer = ({
     const DownloadIcon = () => (
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" /></svg>
     );
+
+    // ===== Smooth Transition SweetAlert =====
+    useEffect(() => {
+        if (transitioning) {
+            Swal.fire({
+                title: 'กำลังโหลดตอนถัดไป...',
+                allowOutsideClick: false,
+                showConfirmButton: false,
+                background: 'rgba(0,0,0,0.8)',
+                color: '#fff',
+                target: (containerRef.current || document.body) as HTMLElement,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+        } else {
+            if (Swal.isVisible() && Swal.getTitle()?.textContent === 'กำลังโหลดตอนถัดไป...') {
+                Swal.close();
+            }
+        }
+    }, [transitioning]);
 
     return (
         <div
@@ -670,13 +707,6 @@ const VideoPlayer = ({
                 </div>
             </div>
 
-            {/* Smooth Transition Overlay */}
-            {transitioning && (
-                <div className="vp-transition-overlay">
-                    <div className="vp-spinner" />
-                    <p className="vp-transition-text">กำลังโหลดตอนถัดไป...</p>
-                </div>
-            )}
         </div>
     );
 };
