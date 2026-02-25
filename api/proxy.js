@@ -155,8 +155,14 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'FlexTV token not configured.' });
     }
 
+    // Strip internal params (platform, action) before forwarding to upstream
+    const flexParams = new URLSearchParams(queryString || '');
+    flexParams.delete('platform');
+    flexParams.delete('action');
+    const flexCleanQuery = flexParams.toString();
+
     try {
-      const url = `${FLEX_API_URL}${pathname}${queryString ? '?' + queryString : ''}`;
+      const url = `${FLEX_API_URL}${pathname}${flexCleanQuery ? '?' + flexCleanQuery : ''}`;
 
       if (apiCache.has(url) && apiCache.get(url).expiry > Date.now()) {
         res.setHeader('Cache-Control', 'public, max-age=300');
@@ -168,7 +174,8 @@ export default async function handler(req, res) {
         headers: {
           Authorization: `Bearer ${FLEX_TOKEN}`,
           'User-Agent': 'FlexTV-App/1.0'
-        }
+        },
+        timeout: 15000,
       });
 
       apiCache.set(url, { data: response.data, expiry: Date.now() + CACHE_TTL });

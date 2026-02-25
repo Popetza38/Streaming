@@ -114,7 +114,8 @@ export const useInfiniteDramas = () => {
       setHasMore(
         platform === 'shortbox' ? list.length >= 20 :
           platform === 'shortmax' ? list.length >= 20 :
-            list.length >= 50
+            platform === 'flextv' ? list.length >= 20 :
+              list.length >= 50
       );
     } catch (error) {
       console.error('Failed to fetch dramas:', error);
