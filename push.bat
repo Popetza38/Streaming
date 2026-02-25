@@ -31,9 +31,8 @@ if not defined HAS_UNCOMMITTED (
     git status
     echo.
     
-    :: Get a cleaner timestamp using wmic (locale independent)
-    for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /format:list') do set datetime=%%I
-    set TIMESTAMP=%datetime:~0,4%-%datetime:~4,2%-%datetime:~6,2% %datetime:~8,2%:%datetime:~10,2%
+    :: Get a cleaner timestamp using powershell (wmic is deprecated)
+    for /f "usebackq" %%I in (`powershell -NoProfile -Command "Get-Date -Format 'yyyy-MM-dd HH:mm'"`) do set TIMESTAMP=%%I
 
     set /p MSG="Commit message (Enter = auto-timestamp): "
     if "!MSG!"=="" set MSG=Update !TIMESTAMP!
