@@ -9,15 +9,15 @@
     },
     {
       "source": "/sb-proxy",
-      "destination": "/api/proxy"
+      "destination": "/api/proxy?action=sb-proxy"
     },
     {
       "source": "/derive-key",
-      "destination": "/api/proxy"
+      "destination": "/api/proxy?action=derive-key"
     },
     {
       "source": "/img",
-      "destination": "/api/proxy"
+      "destination": "/api/proxy?action=img"
     },
     {
       "source": "/video",

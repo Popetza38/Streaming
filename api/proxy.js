@@ -39,9 +39,10 @@ export default async function handler(req, res) {
   const platform = params.get('platform') || 'dramabox';
   const targetUrlParam = params.get('url');
   const kid = params.get('kid');
+  const action = params.get('action');
 
   // 1. SB-Proxy handler (CDN & Video Segments)
-  if (req.url.startsWith('/sb-proxy') || pathname === '/sb-proxy') {
+  if (action === 'sb-proxy' || req.url.startsWith('/sb-proxy') || pathname === '/sb-proxy') {
     if (!targetUrlParam) return res.status(400).end('Missing url');
 
     try {
@@ -102,7 +103,7 @@ export default async function handler(req, res) {
   }
 
   // 2. Derive-key handler
-  if (req.url.startsWith('/derive-key') || pathname === '/derive-key') {
+  if (action === 'derive-key' || req.url.startsWith('/derive-key') || pathname === '/derive-key') {
     const playAuth = params.get('playAuth');
     const kidVal = params.get('kid');
 
@@ -120,7 +121,7 @@ export default async function handler(req, res) {
   }
 
   // 3. Image proxy handler
-  if (req.url.startsWith('/img') || pathname === '/img') {
+  if (action === 'img' || req.url.startsWith('/img') || pathname === '/img') {
     if (!targetUrlParam) return res.status(400).end('Missing url');
     try {
       const resp = await axios.get(targetUrlParam, {
@@ -136,6 +137,7 @@ export default async function handler(req, res) {
   }
 
   params.delete('platform');
+  params.delete('action');
   const cleanQuery = params.toString();
 
   if (platform === 'shortbox') {
