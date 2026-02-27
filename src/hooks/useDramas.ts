@@ -454,7 +454,7 @@ export const useWatchData = (id: string | undefined, episode: number, platformOv
             detailCache[cacheKey] = drama;
           }
 
-          const epCount = drama?.episode_prices?.length || drama?.totalEpisodes || 0;
+          const epCount = (drama?.episode_prices ? Object.keys(drama.episode_prices).length : 0) || drama?.totalEpisodes || 0;
           setTotalEpisodes(epCount);
           setChapters(normalizeChapters(null, platform, epCount));
 
