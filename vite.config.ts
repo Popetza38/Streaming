@@ -23,6 +23,8 @@ function apiProxyPlugin(): Plugin {
   let SB_TOKEN = ''
   let FLEX_API_URL = ''
   let FLEX_API_TOKEN = ''
+  let DP_API_URL = ''
+  let DP_API_TOKEN = ''
 
   async function handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     const reqUrl = req.url || ''
@@ -54,6 +56,12 @@ function apiProxyPlugin(): Plugin {
       headers = {
         'Authorization': `Bearer ${FLEX_API_TOKEN}`,
         'User-Agent': 'FlexTV-App/1.0',
+      }
+    } else if (platform === 'dramapops') {
+      targetUrl = `${DP_API_URL}${apiPath}${queryString}`
+      headers = {
+        'Authorization': `Bearer ${DP_API_TOKEN}`,
+        'User-Agent': 'DramaPops-App/1.0',
       }
     } else {
       targetUrl = `${DB_API_URL}${apiPath}${queryString}`
@@ -255,7 +263,9 @@ function apiProxyPlugin(): Plugin {
       SB_TOKEN = env.SB_API_TOKEN || ''
       FLEX_API_URL = env.FLEX_API_URL || ''
       FLEX_API_TOKEN = env.FLEX_API_TOKEN || ''
-      console.log('[api-proxy] DB:', DB_API_URL ? '✅' : '❌', 'SM:', SM_API_URL ? '✅' : '❌', 'SB:', SB_API_URL ? '✅' : '❌', 'FLEX:', FLEX_API_URL ? '✅' : '❌')
+      DP_API_URL = env.DP_API_URL || ''
+      DP_API_TOKEN = env.DP_API_TOKEN || ''
+      console.log('[api-proxy] DB:', DB_API_URL ? '✅' : '❌', 'SM:', SM_API_URL ? '✅' : '❌', 'SB:', SB_API_URL ? '✅' : '❌', 'FLEX:', FLEX_API_URL ? '✅' : '❌', 'DP:', DP_API_URL ? '✅' : '❌')
     },
     configureServer(server) {
       server.middlewares.use((

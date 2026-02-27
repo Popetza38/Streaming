@@ -28,6 +28,9 @@ const Rank = () => {
           url = `/api/foryou?page=${activeTab}&lang=${lang}&platform=shortmax`;
         } else if (platform === 'flextv') {
           url = `/api/tabs/popular?lang=${lang}&platform=flextv`;
+        } else if (platform === 'dramapops') {
+          const dpTypes = ['trending', 'popular', 'popular'];
+          url = `/api/dramas/${dpTypes[activeTab - 1]}?limit=30&lang=${lang}&platform=dramapops`;
         } else {
           url = `/api/rank/${activeTab}?lang=${lang}&platform=${platform}`;
         }
@@ -38,6 +41,9 @@ const Rank = () => {
         if (platform === 'shortmax') {
           const items = data?.data || [];
           const list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
+          setDramas(normalizeDramaList(list, platform));
+        } else if (platform === 'dramapops') {
+          const list = extractList(data, platform);
           setDramas(normalizeDramaList(list, platform));
         } else {
           const list = extractList(data, platform);

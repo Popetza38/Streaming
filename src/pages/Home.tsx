@@ -40,7 +40,7 @@ const ContinueWatchingItem = ({ item }: { item: any }) => {
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-700">
           <div className="h-full bg-red-500 rounded-r" style={{ width: `${Math.min(progress, 100)}%` }} />
         </div>
-        <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded shadow-lg z-10 overflow-hidden" style={{ backgroundColor: item.platform === 'shortmax' ? '#7c3aed' : item.platform === 'flextv' ? '#3b82f6' : '#e50914' }}>
+        <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded shadow-lg z-10 overflow-hidden" style={{ backgroundColor: item.platform === 'shortmax' ? '#7c3aed' : item.platform === 'flextv' ? '#3b82f6' : item.platform === 'dramapops' ? '#10b981' : '#e50914' }}>
           <img src={`/logos/${item.platform || 'dramabox'}.png`} alt="" className="w-full h-full object-contain" />
         </div>
         <div className="absolute top-1.5 right-1.5 bg-black/70 text-[10px] text-white px-1.5 py-0.5 rounded">

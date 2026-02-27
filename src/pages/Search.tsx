@@ -25,6 +25,8 @@ const Search = () => {
           url = `/api/foryou?lang=${lang}&platform=shortmax`;
         } else if (platform === 'flextv') {
           url = `/api/tabs/popular?lang=${lang}&platform=flextv`;
+        } else if (platform === 'dramapops') {
+          url = `/api/dramas/popular?limit=20&lang=${lang}&platform=dramapops`;
         } else {
           url = `/api/rank/2?lang=${lang}&platform=${platform}`;
         }
@@ -35,6 +37,9 @@ const Search = () => {
         if (platform === 'shortmax') {
           const items = data?.data || [];
           const list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
+          setPopularDramas(normalizeDramaList(list, platform));
+        } else if (platform === 'dramapops') {
+          const list = extractList(data, platform);
           setPopularDramas(normalizeDramaList(list, platform));
         } else {
           const list = extractList(data, platform);
@@ -85,6 +90,8 @@ const Search = () => {
         url = `/api/search?q=${encodeURIComponent(q)}&lang=${lang}&platform=shortmax`;
       } else if (platform === 'flextv') {
         url = `/api/search?q=${encodeURIComponent(q)}&lang=${lang}&platform=flextv`;
+      } else if (platform === 'dramapops') {
+        url = `/api/search?q=${encodeURIComponent(q)}&limit=30&lang=${lang}&platform=dramapops`;
       } else {
         url = `/api/search/${encodeURIComponent(q)}/1?lang=${lang}&pageSize=20&platform=${platform}`;
       }

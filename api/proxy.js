@@ -25,10 +25,15 @@ const SB_TOKEN = process.env.SB_API_TOKEN || '';
 const FLEX_API_URL = process.env.FLEX_API_URL || 'https://captain.sapimu.au/flextv/api/v1';
 const FLEX_TOKEN = process.env.FLEX_API_TOKEN || '';
 
+// DramaPops
+const DP_API_URL = process.env.DP_API_URL || 'https://captain.sapimu.au/dramapops/api/v1';
+const DP_TOKEN = process.env.DP_API_TOKEN || '';
+
 const DB_ALLOWED_PATHS = ['/foryou/', '/new/', '/rank/', '/search/', '/suggest/', '/classify', '/chapters/', '/watch/'];
 const SM_ALLOWED_PATHS = ['/foryou', '/detail', '/play', '/search', '/feed', '/home'];
 const SB_ALLOWED_PATHS = ['/list', '/new-list', '/hot-search', '/detail/', '/episodes/', '/search'];
 const FLEX_ALLOWED_PATHS = ['/tabs', '/series', '/play', '/search', '/languages'];
+const DP_ALLOWED_PATHS = ['/homepage', '/dramas', '/drama', '/search', '/languages', '/config'];
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -145,7 +150,46 @@ export default async function handler(req, res) {
     }
   }
 
-  // 4. FlexTV routing
+  // 4. DramaPops routing
+  if (platform === 'dramapops') {
+    if (!DP_ALLOWED_PATHS.some(p => pathname.startsWith(p))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (!DP_TOKEN) {
+      return res.status(500).json({ error: 'DramaPops token not configured.' });
+    }
+
+    try {
+      const url = `${DP_API_URL}${pathname}${queryString ? '?' + queryString : ''}`;
+
+      if (apiCache.has(url) && apiCache.get(url).expiry > Date.now()) {
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(apiCache.get(url).data);
+      }
+
+      const response = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${DP_TOKEN}`,
+          'User-Agent': 'DramaPops-App/1.0'
+        }
+      });
+
+      apiCache.set(url, { data: response.data, expiry: Date.now() + CACHE_TTL });
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.setHeader('X-Cache', 'MISS');
+      res.json(response.data);
+    } catch (err) {
+      res.status(err.response?.status || 500).json({
+        error: 'DramaPops API request failed',
+        details: err.message
+      });
+    }
+    return;
+  }
+
+  // 5. FlexTV routing
   if (platform === 'flextv') {
     if (!FLEX_ALLOWED_PATHS.some(p => pathname.startsWith(p))) {
       return res.status(403).json({ error: 'Forbidden' });

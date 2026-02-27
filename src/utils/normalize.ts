@@ -86,6 +86,21 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
         };
     }
 
+    if (platform === 'dramapops') {
+        return {
+            id: String(raw.id ?? raw.slug ?? ''),
+            name: raw.title ?? raw.name ?? '',
+            cover: raw.poster ?? raw.cover ?? '',
+            episodes: raw.totalEpisodes ?? raw.episodes ?? 0,
+            summary: raw.description ?? raw.summary ?? '',
+            playCount: raw.watchCount ? `${(raw.watchCount / 1000).toFixed(1)}K` : '',
+            score: raw.rating ?? undefined,
+            tags: raw.tags ?? [],
+            corner: undefined,
+            rank: undefined,
+        };
+    }
+
     // dramabox
     return {
         id: raw.bookId ?? '',
@@ -132,6 +147,23 @@ export function extractList(data: any, platform: Platform): any[] {
                 if (Array.isArray(sl)) list.push(...sl);
             });
             return list;
+        }
+        return [];
+    }
+    if (platform === 'dramapops') {
+        // DramaPops homepage: { success, data: [{ name, movies: [...] }] }
+        // DramaPops trending/popular/search: { success, data: [...] }
+        const d = data?.data;
+        if (Array.isArray(d)) {
+            // Check if it's homepage sections (array of objects with 'movies')
+            if (d.length > 0 && d[0]?.movies) {
+                const list: any[] = [];
+                d.forEach((section: any) => {
+                    if (Array.isArray(section.movies)) list.push(...section.movies);
+                });
+                return list;
+            }
+            return d;
         }
         return [];
     }
@@ -208,6 +240,21 @@ export function normalizeWatchData(data: any, platform: Platform): NormalizedWat
         };
     }
 
+    if (platform === 'dramapops') {
+        // DramaPops video: { qualities: [{ videoUrl, quality, bitrate }] }
+        const qualities = data?.qualities || [];
+        // Pick best quality available (1080p > 720p > 480p > 360p)
+        const best = qualities.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+        const videoUrl = best?.videoUrl || data?.videoUrl || '';
+        return {
+            name: data?.name ?? data?.title ?? '',
+            cover: data?.cover ?? data?.poster ?? '',
+            videoUrl,
+            summary: data?.description ?? data?.summary ?? '',
+            isHls: videoUrl.includes('.m3u8'),
+        };
+    }
+
     // dramabox
     return {
         name: data?.bookName ?? '',
@@ -256,6 +303,15 @@ export function normalizeChapters(data: any, platform: Platform, totalEpisodes?:
             }));
         }
         // Fallback: generate from total
+        const count = totalEpisodes ?? 0;
+        return Array.from({ length: count }, (_, i) => ({
+            id: String(i + 1),
+            index: i,
+        }));
+    }
+
+    if (platform === 'dramapops') {
+        // DramaPops: generate episodes from totalEpisodes
         const count = totalEpisodes ?? 0;
         return Array.from({ length: count }, (_, i) => ({
             id: String(i + 1),

@@ -21,7 +21,7 @@ const Watch = () => {
   const lastTimeRef = useRef({ time: 0, duration: 0 });
 
   // Compute effective platform synchronously from URL param
-  const validPlatforms: Platform[] = ['dramabox', 'shortmax', 'shortbox', 'flextv'];
+  const validPlatforms: Platform[] = ['dramabox', 'shortmax', 'shortbox', 'flextv', 'dramapops'];
   const urlPlatform = searchParams.get('p') as Platform | null;
   const effectivePlatform = (urlPlatform && validPlatforms.includes(urlPlatform)) ? urlPlatform : platform;
 

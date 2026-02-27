@@ -46,6 +46,8 @@ export const useDramas = () => {
       params.page = 1;
     } else if (platform === 'flextv') {
       path = '/api/tabs/popular';
+    } else if (platform === 'dramapops') {
+      path = '/api/homepage';
     } else {
       path = '/api/foryou/1';
     }
@@ -95,6 +97,9 @@ export const useInfiniteDramas = () => {
       } else if (platform === 'flextv') {
         path = '/api/tabs/new';
         params.page_no = pageNum;
+      } else if (platform === 'dramapops') {
+        path = '/api/dramas';
+        params.limit = 30;
       } else {
         path = `/api/new/${pageNum}`;
         params.pageSize = 50;
@@ -166,6 +171,9 @@ export const useRankDramas = () => {
       params.page = 2;
     } else if (platform === 'flextv') {
       path = '/api/tabs/popular';
+    } else if (platform === 'dramapops') {
+      path = '/api/dramas/trending';
+      params.limit = 30;
     } else {
       path = '/api/rank/1';
     }
@@ -180,6 +188,8 @@ export const useRankDramas = () => {
           const items = data?.data || [];
           list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
         } else if (platform === 'flextv') {
+          list = extractList(data, platform);
+        } else if (platform === 'dramapops') {
           list = extractList(data, platform);
         } else {
           list = data?.data?.list || [];
@@ -223,6 +233,10 @@ export const useSearchDramas = (query: string) => {
         } else if (platform === 'flextv') {
           path = '/api/search';
           params.q = query;
+        } else if (platform === 'dramapops') {
+          path = '/api/search';
+          params.q = query;
+          params.limit = 30;
         } else {
           path = `/api/search/${encodeURIComponent(query)}/1`;
           params.pageSize = 20;
@@ -426,6 +440,35 @@ export const useWatchData = (id: string | undefined, episode: number, platformOv
             const watchRaw = { ...detailInner, ...playData?.data };
             setWatchData(normalizeWatchData(watchRaw, platform));
           }
+        } else if (platform === 'dramapops') {
+          // DramaPops: /drama/:id for details, /drama/:id/episode/:ep/video for play
+          const cacheKey = `${platform}_${id}_${lang}`;
+
+          let drama;
+          if (detailCache[cacheKey]) {
+            drama = detailCache[cacheKey];
+          } else {
+            const detailRes = await fetch(apiUrl(`/api/drama/${id}`, platform, { lang }));
+            const detailData = await detailRes.json();
+            drama = detailData?.data;
+            detailCache[cacheKey] = drama;
+          }
+
+          const epCount = drama?.totalEpisodes || 0;
+          setTotalEpisodes(epCount);
+          setChapters(normalizeChapters(null, platform, epCount));
+
+          // Fetch video for the episode
+          const playRes = await fetch(apiUrl(`/api/drama/${id}/episode/${episode}/video`, platform, { lang }));
+          const playData = await playRes.json();
+
+          const watchRaw = {
+            name: drama?.title,
+            cover: drama?.poster,
+            summary: drama?.description,
+            qualities: playData?.data?.qualities,
+          };
+          setWatchData(normalizeWatchData(watchRaw, platform));
         } else {
           // DramaBox: fetch chapters list + watch data
           if (chapters.length === 0) {

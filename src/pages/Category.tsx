@@ -32,14 +32,18 @@ const Category = () => {
           setCategories(defaultTags);
           setSelectedCategory(defaultTags[0].tagId);
         } else {
-          const path = platform === 'flextv' ? '/api/tabs/popular' : '/api/foryou/1';
+          const path = platform === 'flextv' ? '/api/tabs/popular'
+            : platform === 'dramapops' ? '/api/dramas/popular'
+              : '/api/foryou/1';
           const response = await fetch(`${path}?lang=${lang}&platform=${platform}`);
           const data = await response.json();
           const list = extractList(data, platform);
           if (list.length > 0) {
             const allTags = new Map<number, string>();
             list.slice(0, 5).forEach((drama: any) => {
-              const tags = platform === 'flextv' ? drama.tag_list : drama.tagDetails;
+              const tags = platform === 'flextv' ? drama.tag_list
+                : platform === 'dramapops' ? drama.tags
+                  : drama.tagDetails;
               tags?.forEach((tag: any) => {
                 const tagId = typeof tag === 'string' ? tag : tag.tagId;
                 const tagName = typeof tag === 'string' ? tag : tag.tagName;
@@ -77,6 +81,8 @@ const Category = () => {
           url = `/api/foryou?page=${selectedCategory}&lang=${lang}&platform=shortmax`;
         } else if (platform === 'flextv') {
           url = `/api/tabs/popular?lang=${lang}&platform=flextv`;
+        } else if (platform === 'dramapops') {
+          url = `/api/dramas/popular?limit=30&lang=${lang}&platform=dramapops`;
         } else {
           url = `/api/classify?lang=${lang}&pageNo=1&pageSize=15&sort=1&tag=${selectedCategory}&platform=${platform}`;
         }
@@ -87,6 +93,9 @@ const Category = () => {
         if (platform === 'shortmax') {
           const items = data?.data || [];
           const list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
+          setDramas(normalizeDramaList(list, platform));
+        } else if (platform === 'dramapops') {
+          const list = extractList(data, platform);
           setDramas(normalizeDramaList(list, platform));
         } else {
           const list = extractList(data, platform);
