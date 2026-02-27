@@ -463,8 +463,8 @@ export const useWatchData = (id: string | undefined, episode: number, platformOv
           const playData = await playRes.json();
 
           const watchRaw = {
-            name: drama?.title,
-            cover: drama?.poster,
+            name: drama?.title || drama?.movie_unique_title || playData?.data?.slug,
+            cover: playData?.data?.poster || (drama?.poster_uri_prefix ? `${drama.poster_uri_prefix}${drama.poster_uri_suffix}` : '') || drama?.poster,
             summary: drama?.description,
             qualities: playData?.data?.qualities,
           };

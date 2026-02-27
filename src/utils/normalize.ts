@@ -87,13 +87,15 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
     }
 
     if (platform === 'dramapops') {
+        const cover = raw.poster ?? raw.cover ?? (raw.poster_uri_prefix && raw.poster_uri_suffix ? `${raw.poster_uri_prefix}${raw.poster_uri_suffix}` : '');
+        const watchCt = raw.watchCount ?? raw.watch_count;
         return {
             id: String(raw.id ?? raw.slug ?? ''),
-            name: raw.title ?? raw.name ?? '',
-            cover: raw.poster ?? raw.cover ?? '',
-            episodes: raw.totalEpisodes ?? raw.episodes ?? 0,
+            name: raw.title ?? raw.name ?? raw.movie_unique_title ?? '',
+            cover: cover,
+            episodes: raw.totalEpisodes ?? (raw.episode_prices ? Object.keys(raw.episode_prices).length : 0) ?? raw.episodes ?? 0,
             summary: raw.description ?? raw.summary ?? '',
-            playCount: raw.watchCount ? `${(raw.watchCount / 1000).toFixed(1)}K` : '',
+            playCount: watchCt ? `${(watchCt / 1000).toFixed(1)}K` : '',
             score: raw.rating ?? undefined,
             tags: raw.tags ?? [],
             corner: undefined,
