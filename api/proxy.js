@@ -161,7 +161,12 @@ export default async function handler(req, res) {
     }
 
     try {
-      const url = `${DP_API_URL}${pathname}${queryString ? '?' + queryString : ''}`;
+      // Strip internal params before forwarding to upstream
+      const dpParams = new URLSearchParams(queryString || '');
+      dpParams.delete('platform');
+      dpParams.delete('action');
+      const dpCleanQuery = dpParams.toString();
+      const url = `${DP_API_URL}${pathname}${dpCleanQuery ? '?' + dpCleanQuery : ''}`;
 
       if (apiCache.has(url) && apiCache.get(url).expiry > Date.now()) {
         res.setHeader('Cache-Control', 'public, max-age=300');
