@@ -4,28 +4,32 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
+    },
+    {
       "source": "/download",
-      "destination": "/api/download"
+      "destination": "/api/index.js"
     },
     {
       "source": "/sb-proxy",
-      "destination": "/api/proxy?action=sb-proxy"
+      "destination": "/api/index.js?action=sb-proxy"
     },
     {
       "source": "/derive-key",
-      "destination": "/api/proxy?action=derive-key"
+      "destination": "/api/index.js?action=derive-key"
     },
     {
       "source": "/img",
-      "destination": "/api/proxy?action=img"
+      "destination": "/api/index.js?action=img"
     },
     {
       "source": "/video",
-      "destination": "/api/video"
+      "destination": "/api/index.js"
     },
     {
-      "source": "/api/:path*",
-      "destination": "/api/proxy"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
