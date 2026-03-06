@@ -1,8 +1,6 @@
 import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
 
-// Import our existing handlers as standard modules or copy logic
+// Import our existing handlers
 import proxyHandler from '../backend/proxy.js';
 import adminHandler from '../backend/admin.js';
 import authHandler from '../backend/auth.js';
@@ -18,40 +16,42 @@ import sheetsHandler from '../backend/sheets.js';
 import userHandler from '../backend/user.js';
 import videoHandler from '../backend/video.js';
 
-const app = express();
+export default async function handler(req, res) {
+    // Global CORS Handling
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-app.use(cors());
-app.use(express.json());
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
 
-// Helper to adapt Next.js/Vercel serverless (req, res) to Express
-const createAdaptor = (handler) => async (req, res) => {
+    // Determine the route
+    // req.url in Vercel will look like "/api/auth?foo=bar" or "/api/proxy"
+    const path = req.url.split('?')[0];
+
     try {
-        await handler(req, res);
+        if (path.startsWith('/api/admin')) return await adminHandler(req, res);
+        if (path.startsWith('/api/auth')) return await authHandler(req, res);
+        if (path.startsWith('/api/carousel')) return await carouselHandler(req, res);
+        if (path.startsWith('/api/coupons')) return await couponsHandler(req, res);
+        if (path.startsWith('/api/debug')) return await debugHandler(req, res);
+        if (path.startsWith('/api/download')) return await downloadHandler(req, res);
+        if (path.startsWith('/api/history')) return await historyHandler(req, res);
+        if (path.startsWith('/api/membership')) return await membershipHandler(req, res);
+        if (path.startsWith('/api/payments')) return await paymentsHandler(req, res);
+        if (path.startsWith('/api/reviews')) return await reviewsHandler(req, res);
+        if (path.startsWith('/api/sheets')) return await sheetsHandler(req, res);
+        if (path.startsWith('/api/user')) return await userHandler(req, res);
+        if (path.startsWith('/api/video')) return await videoHandler(req, res);
+
+        // Fallback: anything that doesn't match a specific handler goes to the proxy handler
+        // This allows /api/dramas, /api/foryou, /api/search to hit the proxy as designed.
+        return await proxyHandler(req, res);
     } catch (err) {
-        console.error('Handler error:', err);
+        console.error(`[API Router Error] on path ${path}:`, err);
         if (!res.headersSent) {
-            res.status(500).json({ error: 'Internal Server Error' });
+            return res.status(500).json({ error: 'Internal Server Error', message: err.message });
         }
     }
-};
-
-// Route definitions based on existing files
-app.all('/api/proxy', createAdaptor(proxyHandler));
-app.all('/api/admin', createAdaptor(adminHandler));
-app.all('/api/auth', createAdaptor(authHandler));
-app.all('/api/carousel', createAdaptor(carouselHandler));
-app.all('/api/coupons', createAdaptor(couponsHandler));
-app.all('/api/debug', createAdaptor(debugHandler));
-app.all('/api/download', createAdaptor(downloadHandler));
-app.all('/api/history', createAdaptor(historyHandler));
-app.all('/api/membership', createAdaptor(membershipHandler));
-app.all('/api/payments', createAdaptor(paymentsHandler));
-app.all('/api/reviews', createAdaptor(reviewsHandler));
-app.all('/api/sheets', createAdaptor(sheetsHandler));
-app.all('/api/user', createAdaptor(userHandler));
-app.all('/api/video', createAdaptor(videoHandler));
-
-// Catch-all route to let the proxy handle dynamic frontend /api routes
-app.all('/api/*', createAdaptor(proxyHandler));
-
-export default app;
+}
