@@ -1,7 +1,7 @@
-import { Search, Users, LogIn, LogOut, Shield, Settings as SettingsIcon, Crown } from 'lucide-react'
+import { Search, LogIn, LogOut, Shield, Settings as SettingsIcon, Crown } from 'lucide-react'
 import Swal from 'sweetalert2'
 import { Link, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useLanguage, languages } from '../../store/language'
 import { usePlatform, platforms } from '../../store/platform'
 import { useAuth } from '../../contexts/AuthContext'
@@ -14,20 +14,9 @@ export default function Header() {
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showPlatformMenu, setShowPlatformMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [activeUsers, setActiveUsers] = useState(0);
   const { user, profile, signOut } = useAuth();
-  const isVip = profile?.tier === 'vip' && (profile?.vipUntil || 0) > Date.now();
+  const isVip = profile?.tier === 'vip'; // Show crown if tier is vip
 
-  useEffect(() => {
-    setActiveUsers(Math.floor(Math.random() * 300) + 1200);
-    const interval = setInterval(() => {
-      setActiveUsers(prev => {
-        const change = Math.floor(Math.random() * 11) - 5;
-        return Math.max(10, prev + change);
-      });
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   const activePlatform = platforms.find(p => p.id === platform) || platforms[0];
 
@@ -46,17 +35,6 @@ export default function Header() {
         </Link>
 
         <div className="flex items-center gap-1 sm:gap-2">
-          {/* Active Users */}
-          <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1.5 bg-green-500/10 border border-green-500/20 rounded-xl mr-0.5 sm:mr-1">
-            <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 bg-green-500"></span>
-            </span>
-            <Users size={12} className="text-green-500 sm:w-[14px] sm:h-[14px] hidden sm:block" />
-            <span className="text-[10px] sm:text-xs font-semibold text-green-400 tabular-nums tracking-tight">
-              {activeUsers.toLocaleString()}
-            </span>
-          </div>
 
           {/* Platform Selector */}
           <div className="relative">
@@ -148,7 +126,7 @@ export default function Header() {
                   ) : (
                     profile?.username?.charAt(0) || user.email?.charAt(0) || 'U'
                   )}
-                  {isVip && (
+                  {profile?.tier === 'vip' && (
                     <div className="absolute -top-2.5 -right-1 bg-gradient-to-tr from-yellow-600 to-yellow-400 p-0.5 rounded-md shadow-lg border border-yellow-300/50 text-black">
                       <Crown size={8} fill="black" />
                     </div>

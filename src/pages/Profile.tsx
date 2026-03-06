@@ -6,26 +6,20 @@ import {
     ChevronRight,
     LogOut,
     Settings,
-    CreditCard,
-    History,
-    Award,
     UserCircle,
     Key,
-    Heart,
-    PlayCircle,
     Crown,
     Camera,
     Gift,
     Wallet,
-    Star,
-    LayoutDashboard,
-    Bell,
     Activity,
-    ExternalLink,
-    X,
     Menu,
-    Calendar,
-    ArrowRight
+    ArrowRight,
+    LayoutDashboard,
+    History as HistoryIcon,
+    Heart,
+    PlayCircle,
+    CreditCard
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
@@ -77,7 +71,7 @@ export default function Profile() {
         }
     };
 
-    const isVip = profile?.tier === 'vip' && (profile?.vipUntil || 0) > Date.now();
+    const isVip = profile?.tier === 'vip';
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -256,261 +250,307 @@ export default function Profile() {
         { name: 'รางวัลรายวัน', icon: Gift, tab: 'rewards' as const, color: 'hover:text-red-400' },
         { name: 'แก้ไขโปรไฟล์', icon: UserCircle, tab: 'settings' as const, color: 'hover:text-emerald-400' },
         { name: 'ความปลอดภัย', icon: Key, tab: 'security' as const, color: 'hover:text-yellow-400' },
-        { name: 'กิจกรรมล่าสุด', icon: History, tab: 'activity' as const, color: 'hover:text-purple-400' },
+        { name: 'กิจกรรมล่าสุด', icon: HistoryIcon, tab: 'activity' as const, color: 'hover:text-purple-400' },
     ];
 
     const activityItems = [
         { icon: <Heart size={20} />, label: 'รายการที่บันทึกไว้', desc: 'ละครที่คุณบันทึกไว้', color: 'text-pink-400', bg: 'bg-pink-400/10', onClick: () => navigate('/mylist') },
         { icon: <PlayCircle size={20} />, label: 'ประวัติการรับชม', desc: 'รายการที่คุณดูล่าสุด', color: 'text-orange-400', bg: 'bg-orange-400/10', onClick: () => navigate('/history') },
-        { icon: <History size={20} />, label: 'ประวัติการซื้อ', desc: 'ละครที่ปลดล็อกแล้ว', color: 'text-blue-400', bg: 'bg-blue-400/10', onClick: () => { } },
+        { icon: <HistoryIcon size={20} />, label: 'ประวัติการซื้อ', desc: 'ละครที่ปลดล็อกแล้ว', color: 'text-blue-400', bg: 'bg-blue-400/10', onClick: () => { } },
         { icon: <CreditCard size={20} />, label: 'ประวัติการเติมเงิน', desc: 'รายการธุรกรรมเงิน', color: 'text-emerald-400', bg: 'bg-emerald-400/10', onClick: () => { } },
     ];
 
     return (
-        <div className="min-h-screen bg-[#09090b] flex overflow-hidden pt-14 sm:pt-16 relative">
+        <div className="min-h-screen bg-[#020203] flex overflow-hidden pt-14 sm:pt-16 relative">
+            <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_-20%,#ef444415,transparent_50%),radial-gradient(circle_at_70%_120%,#eab30805,transparent_50%)] pointer-events-none" />
+
             {/* Mobile Backdrop */}
             {isSidebarOpen && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+                    className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] lg:hidden animate-in fade-in duration-300"
                     onClick={() => setIsSidebarOpen(false)}
                 />
             )}
 
             {/* Sidebar (Responsive) */}
             <aside
-                className={`fixed inset-y-0 left-0 z-50 w-72 bg-zinc-900 shadow-2xl border-r border-zinc-800 transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                className={`fixed inset-y-0 left-0 z-[70] w-72 bg-zinc-950/50 backdrop-blur-2xl border-r border-white/5 transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
             >
                 <div className="flex flex-col h-full">
-                    {/* Sidebar Header/User Profile */}
-                    <div className="p-6 relative">
-                        <button
-                            onClick={() => setIsSidebarOpen(false)}
-                            className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white lg:hidden"
-                        >
-                            <X size={20} />
-                        </button>
-                        <div className="bg-zinc-950/50 rounded-3xl p-6 border border-zinc-800 relative group overflow-hidden mt-4 lg:mt-0">
+                    {/* Sidebar Header - Mini Profile */}
+                    <div className="p-8">
+                        <div className="relative group cursor-pointer" onClick={() => setActiveTab('settings')}>
+                            <div className={`relative w-24 h-24 mx-auto rounded-3xl overflow-hidden border-2 transition-all duration-500 group-hover:scale-105 group-hover:rotate-3 ${isVip ? 'border-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.2)]' : 'border-white/10'}`}>
+                                {profile.avatar ? (
+                                    <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-3xl font-black text-white bg-gradient-to-br from-zinc-800 to-zinc-950">
+                                        {profile.username?.charAt(0)}
+                                    </div>
+                                )}
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Camera size={20} className="text-white" />
+                                </div>
+                            </div>
                             {isVip && (
-                                <div className="absolute top-0 right-0 p-2 text-yellow-500 animate-pulse">
-                                    <Crown size={16} fill="currentColor" />
+                                <div className="absolute -top-3 -right-3 p-2 bg-gradient-to-tr from-yellow-600 to-yellow-400 rounded-xl shadow-xl border border-yellow-300/50 text-black rotate-12 group-hover:rotate-0 transition-transform">
+                                    <Crown size={16} fill="black" />
                                 </div>
                             )}
-                            <div className="flex flex-col items-center text-center">
-                                <div className={`relative w-24 h-24 rounded-full border-4 mb-4 overflow-hidden ${isVip ? 'border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.3)]' : 'border-zinc-800'}`}>
-                                    {profile.avatar ? (
-                                        <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-3xl font-black text-zinc-700 bg-zinc-900">
-                                            {profile.username?.charAt(0)}
-                                        </div>
-                                    )}
-                                </div>
-                                <h3 className="text-lg font-black text-white truncate w-full px-2">{profile.username}</h3>
-                                <div className="mt-2 flex items-center gap-1.5 px-3 py-1 bg-zinc-900 rounded-full border border-zinc-800">
-                                    {isVip ? (
-                                        <>
-                                            <Star size={12} className="text-yellow-500 fill-yellow-500" />
-                                            <span className="text-[10px] font-black text-yellow-500 uppercase tracking-widest">VIP Premium</span>
-                                        </>
-                                    ) : (
-                                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Free Member</span>
-                                    )}
-                                </div>
+                        </div>
+                        <div className="mt-6 text-center">
+                            <h3 className="text-xl font-black text-white tracking-tight truncate px-2">{profile.username}</h3>
+                            <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                                <div className={`w-1.5 h-1.5 rounded-full ${isVip ? 'bg-yellow-500 animate-pulse' : 'bg-zinc-500'}`} />
+                                <span className={`text-[10px] font-black uppercase tracking-widest ${isVip ? 'text-yellow-500' : 'text-zinc-500'}`}>
+                                    {isVip ? 'VIP Premium' : 'Free Member'}
+                                </span>
                             </div>
                         </div>
                     </div>
 
                     {/* Navigation */}
-                    <nav className="flex-1 px-4 space-y-1">
+                    <nav className="flex-1 px-4 space-y-2 mt-4">
                         {navigation.map((item) => (
                             <button
                                 key={item.tab}
                                 onClick={() => { setActiveTab(item.tab); setIsSidebarOpen(false); }}
-                                className={`w-full flex items-center gap-3 px-4 py-4 rounded-2xl text-sm font-bold transition-all group ${activeTab === item.tab ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'text-zinc-500 hover:bg-zinc-800/50 ' + item.color}`}
+                                className={`w-full flex items-center gap-4 px-5 py-4 rounded-[1.5rem] text-sm font-black transition-all duration-300 group relative overflow-hidden ${activeTab === item.tab
+                                    ? 'bg-gradient-to-r from-red-600 to-red-500 text-white shadow-xl shadow-red-600/20'
+                                    : 'text-zinc-500 hover:text-white hover:bg-white/5'
+                                    }`}
                             >
-                                <item.icon size={20} className={activeTab === item.tab ? 'text-white' : 'group-hover:scale-110 transition-transform'} />
-                                {item.name}
-                                {activeTab === item.tab && <ChevronRight size={16} className="ml-auto" />}
+                                <item.icon size={20} className={activeTab === item.tab ? 'text-white' : 'group-hover:scale-110 transition-transform duration-300'} />
+                                <span className="tracking-tight">{item.name}</span>
+                                {activeTab === item.tab && (
+                                    <>
+                                        <div className="absolute right-4 w-1.5 h-1.5 bg-white rounded-full" />
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] animate-[shimmer_2s_infinite]" />
+                                    </>
+                                )}
                             </button>
                         ))}
                     </nav>
 
                     {/* Sidebar Footer */}
-                    <div className="p-4 border-t border-zinc-800/50">
+                    <div className="p-6">
                         <button
                             onClick={async () => {
                                 const result = await Swal.fire({
-                                    title: 'ยืนยันการออกจากระบบ',
-                                    text: 'คุณต้องการออกจากระบบใช่หรือไม่?',
+                                    title: 'ออกจากระบบ?',
+                                    text: 'เราจะรอคุณกลับมานะครับ',
                                     icon: 'question',
                                     showCancelButton: true,
                                     confirmButtonColor: '#ef4444',
-                                    cancelButtonColor: '#3f3f46',
+                                    cancelButtonColor: '#18181b',
                                     confirmButtonText: 'ออกจากระบบ',
                                     cancelButtonText: 'ยกเลิก',
-                                    background: '#18181b',
-                                    color: '#fff'
+                                    background: '#09090b',
+                                    color: '#fff',
                                 });
                                 if (result.isConfirmed) await signOut();
                             }}
-                            className="w-full flex items-center justify-center gap-2 py-3 bg-zinc-800/50 hover:bg-red-500 text-zinc-400 hover:text-white text-xs font-black rounded-xl transition-all border border-zinc-800"
+                            className="w-full flex items-center justify-center gap-3 py-4 bg-zinc-900 shadow-lg border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-2xl transition-all duration-300 text-xs font-black uppercase tracking-widest"
                         >
-                            <LogOut size={16} /> ออกจากระบบ
+                            <LogOut size={16} /> Logout
                         </button>
                     </div>
                 </div>
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 h-[calc(100vh-4rem)] relative overflow-y-auto w-full">
-                {/* Mobile Header Toggle */}
-                <header className="sticky top-0 z-30 bg-[#09090b]/80 backdrop-blur-md border-b border-zinc-800 px-6 py-4 flex items-center lg:hidden">
+            <main className="flex-1 h-[calc(100vh-4rem)] relative overflow-y-auto w-full scroll-smooth">
+                {/* Mobile Header */}
+                <header className="sticky top-0 z-40 bg-black/60 backdrop-blur-2xl border-b border-white/5 px-6 py-4 flex items-center justify-between lg:hidden">
                     <button
                         onClick={() => setIsSidebarOpen(true)}
-                        className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white"
+                        className="p-3 bg-white/5 border border-white/10 rounded-2xl text-white active:scale-95 transition-transform"
                     >
                         <Menu size={20} />
                     </button>
-                    <span className="ml-4 text-sm font-black text-white uppercase tracking-widest">{activeTab}</span>
+                    <span className="text-sm font-black text-white uppercase tracking-[0.2em]">Profile</span>
+                    <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/5 overflow-hidden">
+                        <img src={profile.avatar} alt="" className="w-full h-full object-cover" />
+                    </div>
                 </header>
 
-                <div className="p-4 sm:p-8 lg:p-12 max-w-5xl mx-auto space-y-10 pb-20">
-                    {activeTab === 'overview' && (
-                        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            {/* Account stats grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {/* Wallet Card */}
-                                <div className="md:col-span-2 bg-gradient-to-br from-zinc-900 to-black border border-zinc-800 p-8 rounded-[2.5rem] relative overflow-hidden group">
-                                    <div className="absolute -right-12 -bottom-12 opacity-10 group-hover:scale-110 transition-transform duration-700">
-                                        <Wallet size={200} className="text-yellow-500" />
-                                    </div>
-                                    <div className="relative z-10">
-                                        <div className="flex items-center justify-between mb-8">
-                                            <div className="p-4 bg-yellow-500/10 text-yellow-500 rounded-2xl border border-yellow-500/20">
-                                                <Wallet size={28} />
-                                            </div>
-                                            <button
-                                                onClick={() => navigate('/topup')}
-                                                className="px-6 py-3 bg-yellow-500 text-black font-black rounded-2xl text-xs uppercase tracking-widest hover:bg-yellow-400 transition-all shadow-xl shadow-yellow-500/20 active:scale-95"
-                                            >
-                                                เติมเหรียญ
-                                            </button>
-                                        </div>
-                                        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-2">ยอดเหรียญสะสม</p>
-                                        <div className="flex items-baseline gap-3">
-                                            <h3 className="text-6xl font-black text-white tabular-nums tracking-tighter">
-                                                {profile.coins.toLocaleString()}
-                                            </h3>
-                                            <span className="text-yellow-500 font-bold uppercase tracking-widest text-sm">Coins</span>
-                                        </div>
-                                    </div>
+                {/* Hero / Banner Section */}
+                <div className="relative h-64 sm:h-80 w-full overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-b from-red-600/20 to-[#020203]" />
+                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20" />
+                    <div className="absolute inset-0 flex items-end px-6 sm:px-12 pb-8 sm:pb-12">
+                        <div className="max-w-5xl w-full mx-auto">
+                            <div className="flex items-center gap-2 text-red-500 font-black text-[10px] uppercase tracking-[0.3em] mb-3">
+                                <div className="w-8 h-[2px] bg-red-500" />
+                                My Sanctuary
+                            </div>
+                            <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tighter leading-none mb-4">
+                                Welcome back,<br />
+                                <span className="bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent">
+                                    {profile.username}
+                                </span>
+                            </h1>
+                            <div className="flex flex-wrap gap-3">
+                                <div className="px-4 py-2 bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl flex items-center gap-2">
+                                    <Coins size={14} className="text-yellow-500" />
+                                    <span className="text-xs font-bold text-white">{profile.coins.toLocaleString()} Coins</span>
                                 </div>
-
-                                {/* VIP Status Card */}
-                                <div className={`bg-zinc-900 border p-8 rounded-[2.5rem] relative overflow-hidden group ${isVip ? 'border-yellow-500/30' : 'border-zinc-800'}`}>
-                                    <div className="p-4 bg-white/5 text-yellow-500 rounded-2xl w-fit mb-8 border border-white/10 group-hover:scale-110 transition-transform">
-                                        <Award size={28} />
+                                {isVip && (
+                                    <div className="px-4 py-2 bg-yellow-500/10 backdrop-blur-xl border border-yellow-500/20 rounded-xl flex items-center gap-2">
+                                        <Crown size={14} className="text-yellow-500" />
+                                        <span className="text-xs font-bold text-yellow-500">Premium Member</span>
                                     </div>
-                                    <p className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-2">สถานะสมาชิก</p>
-                                    <h3 className={`text-3xl font-black mb-6 ${isVip ? 'text-yellow-400' : 'text-white'}`}>
-                                        {isVip ? 'Active VIP' : 'Free User'}
-                                    </h3>
-                                    {isVip ? (
-                                        <div className="text-zinc-500 text-sm font-bold flex flex-col gap-1">
-                                            <span>หมดอายุวันที่:</span>
-                                            <span className="text-white">{new Date(profile.vipUntil || 0).toLocaleDateString('th-TH')}</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="p-4 sm:p-12 max-w-5xl mx-auto space-y-12">
+                    {activeTab === 'overview' && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100">
+                            {/* Coins Card */}
+                            <div className="md:col-span-2 bg-zinc-900/40 backdrop-blur-md border border-white/5 p-8 rounded-[3rem] relative overflow-hidden group hover:border-yellow-500/30 transition-colors duration-500">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/5 blur-[100px] rounded-full pointer-events-none" />
+                                <div className="relative z-10 flex flex-col h-full justify-between gap-12">
+                                    <div className="flex items-center justify-between">
+                                        <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-2xl flex items-center justify-center shadow-2xl shadow-yellow-500/20">
+                                            <Wallet size={28} className="text-black" />
                                         </div>
-                                    ) : (
-                                        <button onClick={handleBuyVip} className="w-full py-3.5 bg-white text-black text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-zinc-200 transition-colors shadow-lg">Become VIP</button>
-                                    )}
+                                        <button
+                                            onClick={() => navigate('/topup')}
+                                            className="group/btn relative px-8 py-4 bg-white text-black font-black rounded-2xl text-[10px] uppercase tracking-widest hover:bg-zinc-200 transition-all flex items-center gap-2 overflow-hidden"
+                                        >
+                                            <span className="relative z-10">Add Coins</span>
+                                            <ChevronRight size={14} className="relative z-10 group-hover/btn:translate-x-1 transition-transform" />
+                                            <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-yellow-600 opacity-0 group-hover/btn:opacity-100 transition-opacity" />
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em] mb-2">Total Balance</p>
+                                        <h3 className="text-7xl font-black text-white tracking-tighter leading-none tabular-nums">
+                                            {profile.coins.toLocaleString()}
+                                            <span className="text-xl text-yellow-500 ml-4 font-black uppercase tracking-widest">C</span>
+                                        </h3>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Activity Grid */}
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 md:p-10 relative overflow-hidden">
-                                <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
-                                    <Activity size={24} className="text-red-500" /> เข้าถึงด่วน
-                                </h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {activityItems.map((item, idx) => (
-                                        <div
-                                            key={idx}
-                                            onClick={item.onClick}
-                                            className="bg-zinc-950/50 border border-zinc-800/50 p-6 rounded-3xl hover:bg-zinc-800 transition-all text-left flex flex-col group cursor-pointer active:scale-95"
-                                        >
-                                            <div className={`w-12 h-12 ${item.bg} ${item.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
-                                                {item.icon}
+                            {/* Status Card */}
+                            <div className="bg-zinc-900/40 backdrop-blur-md border border-white/5 p-8 rounded-[3rem] group hover:border-red-500/30 transition-colors duration-500">
+                                <div className="flex flex-col h-full justify-between gap-12">
+                                    <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 group-hover:scale-110 transition-transform duration-500">
+                                        <Crown size={28} className={isVip ? 'text-yellow-500' : 'text-zinc-600'} />
+                                    </div>
+                                    <div>
+                                        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em] mb-2">Membership Status</p>
+                                        <h3 className={`text-3xl font-black mb-4 ${isVip ? 'text-white' : 'text-zinc-500'}`}>
+                                            {isVip ? 'Premium VIP' : 'Free User'}
+                                        </h3>
+                                        {isVip ? (
+                                            <div className="p-4 bg-yellow-500/5 border border-yellow-500/10 rounded-2xl">
+                                                <p className="text-zinc-500 text-[10px] font-black uppercase mb-1">Expires on</p>
+                                                <p className="text-yellow-500 font-bold">{new Date(profile.vipUntil || 0).toLocaleDateString('th-TH')}</p>
                                             </div>
-                                            <span className="text-lg font-black text-white leading-tight mb-1">{item.label}</span>
-                                            <span className="text-xs text-zinc-500 font-medium">{item.desc}</span>
-                                        </div>
-                                    ))}
+                                        ) : (
+                                            <button onClick={handleBuyVip} className="w-full py-4 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all shadow-xl shadow-red-600/20 active:scale-95">Upgrade to VIP</button>
+                                        )}
+                                    </div>
                                 </div>
+                            </div>
+
+                            {/* Quick Links Grid */}
+                            <div className="md:col-span-3 grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
+                                {activityItems.map((item, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={item.onClick}
+                                        className="group bg-zinc-950/50 backdrop-blur-xl border border-white/5 p-6 rounded-[2rem] hover:bg-white hover:text-black transition-all duration-500 overflow-hidden relative active:scale-95"
+                                    >
+                                        <div className={`p-4 ${item.bg} ${item.color} rounded-2xl w-fit mb-6 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
+                                            {item.icon}
+                                        </div>
+                                        <p className="text-sm font-black group-hover:translate-x-1 transition-transform">{item.label}</p>
+                                        <p className="text-[10px] text-zinc-600 font-bold group-hover:text-black/60">{item.desc}</p>
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     )}
 
                     {activeTab === 'rewards' && (
-                        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-[3rem] p-10 md:p-16 relative overflow-hidden group">
-                                <div className="absolute -right-20 -top-20 opacity-5 group-hover:scale-125 transition-transform duration-1000">
-                                    <Gift size={400} className="text-red-500" />
-                                </div>
-                                <div className="relative z-10 max-w-2xl text-center md:text-left">
-                                    <div className="p-5 bg-red-500/10 text-red-500 rounded-3xl w-fit mb-10 border border-red-500/20 mx-auto md:mx-0 shadow-lg">
-                                        <Gift size={40} />
-                                    </div>
-                                    <h2 className="text-4xl md:text-5xl font-black text-white tracking-tighter mb-6 leading-tight">เช็คอินรับเหรียญฟรี</h2>
-                                    <p className="text-zinc-500 font-medium mb-12 leading-relaxed text-lg">สะสมเหรียญได้ง่ายๆ เพียงล็อกอินเข้าใช้งานทุกวัน สมาชิก VIP รับเหรียญเพิ่มเป็น 5 เท่า!</p>
+                        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+                            {/* Main Rewards Box */}
+                            <div className="bg-zinc-900/20 backdrop-blur-xl border border-white/5 rounded-[3rem] p-12 md:p-20 relative overflow-hidden group">
+                                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_0%_0%,rgba(239,68,68,0.08),transparent_50%)]" />
+                                <div className="relative z-10 flex flex-col md:flex-row items-center gap-16">
+                                    <div className="flex-1 text-center md:text-left">
+                                        <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-red-600 rounded-3xl flex items-center justify-center mb-10 mx-auto md:mx-0 shadow-2xl shadow-red-600/20 group-hover:rotate-12 transition-transform duration-500">
+                                            <Gift size={40} className="text-white" />
+                                        </div>
+                                        <h2 className="text-5xl md:text-7xl font-black text-white tracking-tighter mb-6 leading-none">Daily<br />Rewards</h2>
+                                        <p className="text-zinc-500 font-medium text-lg leading-relaxed max-w-sm mb-12">Log in daily to claim free coins. VIP members get 5x more rewards!</p>
 
-                                    <div className="flex flex-col md:flex-row items-center gap-8 p-8 bg-black/40 rounded-[2.5rem] border border-zinc-800/50 shadow-2xl backdrop-blur-xl">
-                                        <div className="flex items-center gap-5 w-full md:w-auto">
-                                            <div className="p-5 bg-yellow-500/10 text-yellow-500 rounded-3xl">
-                                                <Coins size={36} />
-                                            </div>
-                                            <div>
-                                                <div className="text-4xl font-black text-white">+{isVip ? settings?.dailyRewardVip || 5 : settings?.dailyRewardFree || 1}</div>
-                                                <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Coins for today</div>
+                                        <div className="grid grid-cols-7 gap-2 mb-12 max-w-sm mx-auto md:mx-0">
+                                            {[1, 2, 3, 4, 5, 6, 7].map(day => (
+                                                <div key={day} className="flex flex-col gap-2 italic">
+                                                    <div className={`aspect-square rounded-lg border flex items-center justify-center text-[10px] font-black ${day === 1 ? 'bg-red-500 border-red-500 text-white' : 'bg-white/5 border-white/10 text-zinc-700'}`}>
+                                                        {day}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="w-full md:w-[400px] p-10 bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-2xl flex flex-col items-center gap-10">
+                                        <div className="text-center">
+                                            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em] mb-4">Today's Reward</p>
+                                            <div className="flex items-center justify-center gap-4">
+                                                <div className="w-16 h-16 bg-yellow-500/10 rounded-2xl flex items-center justify-center border border-yellow-500/20">
+                                                    <Coins size={36} className="text-yellow-500" />
+                                                </div>
+                                                <div className="text-6xl font-black text-white tabular-nums">+{isVip ? settings?.dailyRewardVip || 5 : settings?.dailyRewardFree || 1}</div>
                                             </div>
                                         </div>
                                         <button
                                             onClick={handleClaimDaily}
                                             disabled={isClaiming}
-                                            className="w-full md:flex-1 py-6 bg-red-600 hover:bg-red-700 text-white font-black rounded-3xl transition-all shadow-2xl shadow-red-600/30 active:scale-95 disabled:opacity-50 text-xl flex items-center justify-center gap-3"
+                                            className="w-full py-6 bg-red-600 hover:bg-red-500 text-white font-black rounded-3xl transition-all duration-300 shadow-2xl shadow-red-600/30 active:scale-95 disabled:opacity-50 text-xl tracking-tighter flex items-center justify-center gap-3"
                                         >
-                                            {isClaiming ? <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'เช็คอินทันที'}
+                                            {isClaiming ? <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Claim Rewards'}
                                         </button>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Claim History List */}
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-8 md:p-10">
-                                <h3 className="text-xl font-black text-white uppercase tracking-tight mb-8 flex items-center gap-4">
-                                    <Calendar size={24} className="text-zinc-500" /> ประวัติการเช็คอินล่าสุด
-                                </h3>
+                            <div className="bg-zinc-900/40 border border-white/5 rounded-[3rem] p-10">
+                                <h3 className="text-xl font-black text-white tracking-tight mb-8">Claim History</h3>
                                 <div className="space-y-4">
                                     {historyLoading ? (
-                                        <div className="py-10 text-center text-zinc-600 font-bold animate-pulse">กำลังโหลดข้อมูล...</div>
+                                        <div className="py-12 flex flex-col items-center gap-4">
+                                            <div className="w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                                            <p className="text-zinc-700 text-sm font-black uppercase tracking-widest">Loading History...</p>
+                                        </div>
                                     ) : claimHistory.length > 0 ? (
                                         claimHistory.map((claim, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-5 bg-zinc-950/40 border border-zinc-800 rounded-2xl hover:border-zinc-700 transition-all group">
-                                                <div className="flex items-center gap-5">
-                                                    <div className="w-12 h-12 bg-zinc-900 rounded-xl flex items-center justify-center text-yellow-500 border border-zinc-800 group-hover:scale-110 transition-transform">
-                                                        <Coins size={20} />
+                                            <div key={idx} className="flex items-center justify-between p-6 bg-white/[0.02] border border-white/5 rounded-3xl hover:border-white/10 hover:bg-white/[0.04] transition-all group">
+                                                <div className="flex items-center gap-6">
+                                                    <div className="w-14 h-14 bg-zinc-950 rounded-2xl flex items-center justify-center text-yellow-500 border border-white/5 group-hover:scale-105 transition-transform">
+                                                        <Coins size={24} />
                                                     </div>
                                                     <div>
-                                                        <div className="text-white font-black text-lg">+{claim.amount} เหรียญ</div>
-                                                        <div className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest">{new Date(claim.claimedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                                                        <div className="text-2xl font-black text-white">+{claim.amount} เหรียญ</div>
+                                                        <div className="text-zinc-600 text-[10px] font-black uppercase tracking-[0.2em]">{new Date(claim.claimedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                                                     </div>
                                                 </div>
-                                                <div className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-full uppercase tracking-widest">Successful</div>
+                                                <div className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-4 py-2 rounded-full uppercase tracking-widest">Successful</div>
                                             </div>
                                         ))
                                     ) : (
-                                        <div className="py-20 text-center">
-                                            <div className="text-zinc-700 font-black text-2xl mb-2 italic">ไม่มีประวัติการเช็คอิน</div>
-                                            <p className="text-zinc-600 text-sm">เริ่มต้นรับเหรียญฟรีวันนี้ โดยการกดปุ่มเช็คอินด้านบน</p>
+                                        <div className="py-24 text-center">
+                                            <div className="text-zinc-800 font-black text-5xl mb-4 italic tracking-tighter opacity-50">EMPTY HISTORY</div>
+                                            <p className="text-zinc-600 font-medium">Start claiming today to build your streak!</p>
                                         </div>
                                     )}
                                 </div>
@@ -519,54 +559,58 @@ export default function Profile() {
                     )}
 
                     {activeTab === 'settings' && (
-                        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-[3rem] p-10 md:p-16">
-                                <div className="flex items-center gap-5 mb-12">
-                                    <div className="p-4 bg-emerald-500/10 text-emerald-500 rounded-2xl border border-emerald-500/20">
-                                        <Settings size={28} />
+                        <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+                            <div className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-[4rem] p-12 md:p-20 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-full h-full bg-[radial-gradient(circle_at_100%_100%,rgba(16,185,129,0.05),transparent_50%)]" />
+
+                                <div className="flex items-center gap-6 mb-16 relative">
+                                    <div className="w-16 h-16 bg-emerald-500/10 text-emerald-500 rounded-3xl border border-emerald-500/20 flex items-center justify-center">
+                                        <Settings size={32} />
                                     </div>
-                                    <h3 className="text-2xl font-black text-white uppercase tracking-tight">ข้อมูลส่วนตัว</h3>
+                                    <div>
+                                        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em]">Configuration</p>
+                                        <h3 className="text-4xl font-black text-white tracking-tight">Profile Settings</h3>
+                                    </div>
                                 </div>
-                                <form onSubmit={handleUpdateProfile} className="space-y-10">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                        <div className="space-y-4">
-                                            <label className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-3">
-                                                <UserCircle size={14} className="text-red-500" /> ชื่อของคุณ
+
+                                <form onSubmit={handleUpdateProfile} className="space-y-12 relative">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                        <div className="space-y-6">
+                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] flex items-center gap-3">
+                                                Public Alias
                                             </label>
                                             <input
                                                 type="text"
                                                 value={form.username}
                                                 onChange={e => setForm({ ...form, username: e.target.value })}
-                                                className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-[1.5rem] px-8 py-5 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all font-black placeholder:text-zinc-900 outline-none shadow-inner"
+                                                className="w-full bg-zinc-950/50 border border-white/5 text-white rounded-[2rem] px-8 py-6 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-black text-lg outline-none shadow-2xl"
                                                 required
                                             />
                                         </div>
-                                        <div className="space-y-4">
-                                            <label className="text-xs font-black text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-3">
-                                                <Camera size={14} className="text-red-500" /> URL รูปโปรไฟล์
+                                        <div className="space-y-6">
+                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em] flex items-center gap-3">
+                                                Avatar Source
                                             </label>
                                             <div className="relative group">
                                                 <input
                                                     type="url"
                                                     value={form.avatar}
                                                     onChange={e => setForm({ ...form, avatar: e.target.value })}
-                                                    className="w-full bg-zinc-950 border border-zinc-800 text-white rounded-[1.5rem] px-8 py-5 focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all font-black placeholder:text-zinc-900 outline-none pr-20 shadow-inner"
-                                                    placeholder="ใส่ลิงก์รูปภาพ..."
+                                                    className="w-full bg-zinc-950/50 border border-white/5 text-white rounded-[2rem] px-8 py-6 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-black text-lg outline-none pr-10 shadow-2xl"
+                                                    placeholder="https://..."
                                                 />
-                                                {form.avatar && (
-                                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-2xl overflow-hidden border-2 border-zinc-800 shadow-2xl group-hover:scale-110 transition-transform">
-                                                        <img src={form.avatar} alt="" className="w-full h-full object-cover" />
-                                                    </div>
-                                                )}
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl overflow-hidden shadow-2xl group-hover:scale-110 transition-transform bg-zinc-900">
+                                                    <img src={form.avatar} alt="" className="w-full h-full object-cover" />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
                                     <button
                                         type="submit"
                                         disabled={isSaving}
-                                        className="w-full py-6 bg-white text-black font-black rounded-[1.5rem] hover:bg-zinc-200 transition-all active:scale-[0.98] disabled:opacity-50 text-xl shadow-2xl shadow-white/5"
+                                        className="w-full md:w-fit px-12 py-6 bg-white text-black font-black rounded-[2rem] hover:bg-zinc-200 transition-all active:scale-95 disabled:opacity-50 text-xl tracking-tighter shadow-2xl"
                                     >
-                                        {isSaving ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}
+                                        {isSaving ? 'Synchronizing...' : 'Save Configuration'}
                                     </button>
                                 </form>
                             </div>
@@ -574,58 +618,49 @@ export default function Profile() {
                     )}
 
                     {activeTab === 'security' && (
-                        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-[3rem] p-10 md:p-16">
-                                <div className="flex items-center gap-5 mb-12">
-                                    <div className="p-4 bg-yellow-500/10 text-yellow-500 rounded-2xl border border-yellow-500/20">
-                                        <Shield size={28} />
+                        <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+                            <div className="bg-zinc-900/40 border border-white/5 rounded-[4rem] p-12 md:p-20">
+                                <div className="flex items-center gap-6 mb-16">
+                                    <div className="w-16 h-16 bg-yellow-500/10 text-yellow-500 rounded-3xl border border-yellow-500/20 flex items-center justify-center">
+                                        <Shield size={32} />
                                     </div>
-                                    <h3 className="text-2xl font-black text-white uppercase tracking-tight">ความปลอดภัยของบัญชี</h3>
+                                    <div>
+                                        <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em]">Protection</p>
+                                        <h3 className="text-4xl font-black text-white tracking-tight">Security Center</h3>
+                                    </div>
                                 </div>
+
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <button
                                         onClick={handleChangePassword}
-                                        className="flex items-center justify-between p-10 bg-zinc-950/40 hover:bg-zinc-800 border-2 border-zinc-800/50 rounded-[2.5rem] transition-all group shadow-xl"
+                                        className="group flex items-center justify-between p-12 bg-zinc-950/30 hover:bg-white border border-white/5 rounded-[3rem] transition-all duration-500"
                                     >
-                                        <div className="flex items-center gap-6">
-                                            <div className="p-5 bg-zinc-900 rounded-[1.5rem] group-hover:bg-yellow-500/10 group-hover:text-yellow-500 transition-all border border-zinc-800 shadow-lg">
+                                        <div className="flex items-center gap-8">
+                                            <div className="w-16 h-16 bg-zinc-900 rounded-[1.5rem] flex items-center justify-center border border-white/5 group-hover:bg-black group-hover:text-yellow-500 transition-all">
                                                 <Key size={32} />
                                             </div>
                                             <div className="text-left">
-                                                <div className="font-black text-white text-xl mb-1">เปลี่ยนรหัสผ่าน</div>
-                                                <div className="text-xs text-zinc-600 font-bold uppercase tracking-widest">Update your key</div>
+                                                <div className="text-2xl font-black text-white group-hover:text-black leading-none mb-2">Update Password</div>
+                                                <div className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest group-hover:text-black/40">Secure your account</div>
                                             </div>
                                         </div>
-                                        <ArrowRight size={24} className="text-zinc-800 group-hover:text-white transition-all transform group-hover:translate-x-1" />
+                                        <ArrowRight size={24} className="text-zinc-800 group-hover:text-black group-hover:translate-x-2 transition-all" />
                                     </button>
 
                                     <button
-                                        onClick={async () => {
-                                            const result = await Swal.fire({
-                                                title: 'ยืนยันการออกจากระบบ',
-                                                text: 'คุณต้องการออกจากระบบใช่หรือไม่?',
-                                                icon: 'question',
-                                                showCancelButton: true,
-                                                confirmButtonColor: '#ef4444',
-                                                cancelButtonColor: '#3f3f46',
-                                                confirmButtonText: 'ออกจากระบบ',
-                                                background: '#18181b',
-                                                color: '#fff'
-                                            });
-                                            if (result.isConfirmed) await signOut();
-                                        }}
-                                        className="flex items-center justify-between p-10 bg-red-500/5 hover:bg-red-500/10 border-2 border-red-500/10 rounded-[2.5rem] transition-all group shadow-xl"
+                                        onClick={async () => signOut()}
+                                        className="group flex items-center justify-between p-12 bg-red-500/5 hover:bg-red-500 border border-red-500/20 rounded-[3rem] transition-all duration-500"
                                     >
-                                        <div className="flex items-center gap-6">
-                                            <div className="p-5 bg-red-500/10 text-red-500 rounded-[1.5rem] shadow-lg">
+                                        <div className="flex items-center gap-8">
+                                            <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-[1.5rem] flex items-center justify-center group-hover:bg-white group-hover:text-red-500 transition-all">
                                                 <LogOut size={32} />
                                             </div>
                                             <div className="text-left">
-                                                <div className="font-black text-red-500 text-xl mb-1">ออกจากระบบ</div>
-                                                <div className="text-[10px] text-red-500/40 font-bold uppercase tracking-widest">End session</div>
+                                                <div className="text-2xl font-black text-red-500 group-hover:text-white leading-none mb-2">Sign Out</div>
+                                                <div className="text-[10px] text-red-500/40 font-bold uppercase tracking-widest group-hover:text-white/60">Terminate session</div>
                                             </div>
                                         </div>
-                                        <ArrowRight size={24} className="text-red-500/30 group-hover:text-red-500 transition-all transform group-hover:translate-x-1" />
+                                        <ArrowRight size={24} className="text-red-500/30 group-hover:text-white group-hover:translate-x-2 transition-all" />
                                     </button>
                                 </div>
                             </div>
@@ -633,26 +668,39 @@ export default function Profile() {
                     )}
 
                     {activeTab === 'activity' && (
-                        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-[3rem] p-10 md:p-16 relative min-h-[500px]">
-                                <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-12">บันทึกกิจกรรมล่าสุด</h3>
-                                <div className="grid grid-cols-1 gap-5">
+                        <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+                            <div className="bg-zinc-900/40 border border-white/5 rounded-[4rem] p-12 md:p-16 min-h-[600px] relative">
+                                <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_100%_0%,rgba(168,85,247,0.05),transparent_50%)]" />
+
+                                <div className="flex items-center justify-between mb-16 relative">
+                                    <div className="flex items-center gap-6">
+                                        <div className="w-16 h-16 bg-purple-500/10 text-purple-500 rounded-3xl border border-purple-500/20 flex items-center justify-center">
+                                            <Activity size={32} />
+                                        </div>
+                                        <div>
+                                            <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em]">Logs</p>
+                                            <h3 className="text-4xl font-black text-white tracking-tight">Recent Activity</h3>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-6 relative">
                                     {activityItems.map((item, idx) => (
                                         <button
                                             key={idx}
                                             onClick={item.onClick}
-                                            className="w-full flex items-center justify-between p-8 bg-zinc-950/30 hover:bg-zinc-800 border border-zinc-800/50 rounded-[2rem] transition-all group shadow-lg"
+                                            className="group w-full flex items-center justify-between p-8 bg-zinc-950/30 hover:bg-white border border-white/5 rounded-[2.5rem] transition-all duration-500 active:scale-[0.99]"
                                         >
-                                            <div className="flex items-center gap-6">
-                                                <div className={`p-5 bg-zinc-900 ${item.color} rounded-[1.25rem] group-hover:scale-110 transition-transform shadow-inner border border-zinc-800`}>
+                                            <div className="flex items-center gap-8">
+                                                <div className={`w-16 h-16 bg-zinc-900 ${item.color} rounded-2xl flex items-center justify-center border border-white/5 group-hover:bg-black transition-all`}>
                                                     {item.icon}
                                                 </div>
                                                 <div className="text-left">
-                                                    <div className="text-white font-black text-xl mb-1">{item.label}</div>
-                                                    <div className="text-zinc-600 text-xs font-bold uppercase tracking-widest">{item.desc}</div>
+                                                    <div className="text-xl font-black text-white group-hover:text-black leading-none mb-2">{item.label}</div>
+                                                    <div className="text-xs text-zinc-600 font-bold uppercase tracking-widest group-hover:text-black/40">{item.desc}</div>
                                                 </div>
                                             </div>
-                                            <ChevronRight size={24} className="text-zinc-800 group-hover:text-white transition-all transform group-hover:translate-x-1" />
+                                            <ChevronRight size={24} className="text-zinc-900 group-hover:text-black group-hover:translate-x-2 transition-all" />
                                         </button>
                                     ))}
                                 </div>
@@ -660,10 +708,14 @@ export default function Profile() {
                         </div>
                     )}
 
-                    <div className="text-center pt-10">
-                        <span className="inline-block px-6 py-3 bg-zinc-950 border border-zinc-800 text-zinc-700 text-[11px] font-black uppercase tracking-[0.4em] rounded-full select-none cursor-default shadow-inner">
-                            User ID: {user.uid}
-                        </span>
+                    <div className="text-center pt-12 pb-12">
+                        <div className="inline-flex items-center gap-3 px-8 py-4 bg-zinc-950/50 backdrop-blur-3xl border border-white/5 rounded-full overflow-hidden relative group">
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                            <Shield size={12} className="text-zinc-700" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.5em] text-zinc-700 select-none">
+                                SECURE ID: {user.uid}
+                            </span>
+                        </div>
                     </div>
                 </div>
             </main>

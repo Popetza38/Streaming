@@ -1,4 +1,4 @@
-import { Grid, Users } from 'lucide-react';
+import { Grid } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../store/language';
@@ -214,8 +214,7 @@ const Category = () => {
                 {drama.name}
               </h3>
               <div className="flex items-center gap-1 text-xs text-muted">
-                <Users size={12} />
-                <span>{drama.playCount ? drama.playCount : (drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing')}</span>
+                <span>{drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing'}</span>
               </div>
             </Link>
           ))}

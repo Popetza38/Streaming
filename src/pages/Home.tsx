@@ -1,4 +1,4 @@
-import { Play, Users, Clock, Star } from 'lucide-react';
+import { Play, Clock, Star } from 'lucide-react';
 import { useDramas, useInfiniteDramas, useRankDramas } from '../hooks/useDramas';
 import { Link } from 'react-router-dom';
 import { useEffect, useCallback, useState } from 'react';
@@ -131,11 +131,6 @@ const DramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: stri
           {drama.corner.name}
         </div>
       )}
-      {drama.rank && (
-        <div className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10">
-          🔥 {drama.rank.hotCode}
-        </div>
-      )}
       {/* Episode badge */}
       {drama.episodes && drama.episodes > 0 && (
         <div className="absolute top-2 right-2 bg-black/70 text-[10px] text-white px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
@@ -183,8 +178,7 @@ const DramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: stri
         <InlineStarRating score={drama.score} />
       ) : <div />}
       <div className="flex items-center gap-1 text-[10px] text-muted">
-        <Users size={10} />
-        <span>{drama.playCount ? drama.playCount : (drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing')}</span>
+        <span>{drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing'}</span>
       </div>
     </div>
   </Link>
@@ -239,8 +233,7 @@ const RankedDramaItem = ({ drama, platform, rank }: { drama: NormalizedDrama; pl
         <InlineStarRating score={drama.score} />
       ) : <div />}
       <div className="flex items-center gap-1 text-[10px] text-muted">
-        <Users size={10} />
-        <span>{drama.playCount ? drama.playCount : (drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing')}</span>
+        <span>{drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing'}</span>
       </div>
     </div>
   </Link>
@@ -309,7 +302,6 @@ const GridDramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: 
         <InlineStarRating score={drama.score} />
       ) : <div />}
       <div className="flex items-center gap-1 text-[10px] text-muted">
-        <Users size={10} />
         <span>{drama.playCount ? drama.playCount : (drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing')}</span>
       </div>
     </div>

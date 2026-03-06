@@ -271,7 +271,7 @@ const Search = () => {
                     </div>
                   )}
                   <p className="text-xs text-muted">
-                    {drama.playCount ? drama.playCount : (drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing')}
+                    {drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing'}
                   </p>
                 </Link>
               ))}
@@ -320,7 +320,7 @@ const Search = () => {
                       </div>
                     )}
                     <p className="text-xs text-muted">
-                      {drama.playCount ? `${drama.playCount} views` : (drama.episodes && drama.episodes > 0 ? `${drama.episodes} episodes` : 'Ongoing')}
+                      {drama.episodes && drama.episodes > 0 ? `${drama.episodes} episodes` : 'Ongoing'}
                     </p>
                   </div>
                 </div>
