@@ -102,8 +102,16 @@ export default async function handler(req, res) {
                 const settings = settingsDoc.exists ? settingsDoc.data() : {
                     welcomeBonus: 50,
                     maintenanceMode: false,
-                    announcement: ""
+                    announcement: "",
+                    vipPrice: 300,
+                    vipDurationDays: 30,
+                    dailyRewardFree: 1,
+                    dailyRewardVip: 5
                 };
+                // Fallback for missing fields in existing doc
+                if (settings.dailyRewardFree === undefined) settings.dailyRewardFree = 1;
+                if (settings.dailyRewardVip === undefined) settings.dailyRewardVip = 5;
+
                 return res.status(200).json(settings);
             }
 
@@ -167,7 +175,19 @@ export default async function handler(req, res) {
 
             if (action === 'set_tier') {
                 if (!userId || !tier) return res.status(400).json({ error: 'Missing userId or tier' });
-                await adminDb.collection('users').doc(userId).update({ tier });
+
+                const updates = { tier };
+                if (tier === 'vip') {
+                    const userDoc = await adminDb.collection('users').doc(userId).get();
+                    const userData = userDoc.exists ? userDoc.data() : {};
+                    const now = Date.now();
+                    // If no valid vipUntil exists, set it to 30 days from now
+                    if (!userData.vipUntil || userData.vipUntil < now) {
+                        updates.vipUntil = now + (30 * 24 * 60 * 60 * 1000);
+                    }
+                }
+
+                await adminDb.collection('users').doc(userId).update(updates);
                 await logAction('set_tier', userId, { tier });
                 return res.status(200).json({ success: true });
             }

@@ -32,7 +32,8 @@ export default function TopUp() {
                 title: 'ข้อมูลไม่ครบ',
                 text: 'กรุณาระบุจำนวนเงินและแนบสลิปการโอนเงิน',
                 background: '#18181b',
-                color: '#fff'
+                color: '#fff',
+                confirmButtonColor: '#ef4444'
             });
             return;
         }
@@ -59,7 +60,8 @@ export default function TopUp() {
                     title: 'ส่งหลักฐานสำเร็จ',
                     text: 'เจ้าหน้าที่จะตรวจสอบและเติมเหรียญให้คุณภายใน 5-15 นาที',
                     background: '#18181b',
-                    color: '#fff'
+                    color: '#fff',
+                    confirmButtonColor: '#ef4444'
                 });
                 setAmount('');
                 setSlipImage(null);
@@ -72,7 +74,8 @@ export default function TopUp() {
                 title: 'เกิดข้อผิดพลาด',
                 text: error.message,
                 background: '#18181b',
-                color: '#fff'
+                color: '#fff',
+                confirmButtonColor: '#ef4444'
             });
         } finally {
             setLoading(false);
@@ -100,7 +103,8 @@ export default function TopUp() {
                     title: 'สำเร็จ!',
                     text: data.message,
                     background: '#18181b',
-                    color: '#fff'
+                    color: '#fff',
+                    confirmButtonColor: '#ef4444'
                 });
                 setCouponCode('');
                 await refreshProfile();
@@ -113,7 +117,8 @@ export default function TopUp() {
                 title: 'ผิดพลาด',
                 text: error.message,
                 background: '#18181b',
-                color: '#fff'
+                color: '#fff',
+                confirmButtonColor: '#ef4444'
             });
         } finally {
             setCouponLoading(false);

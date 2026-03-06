@@ -31,7 +31,8 @@ import {
     Activity,
     AlertTriangle,
     Globe,
-    CreditCard
+    CreditCard,
+    Award
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { auth } from '@/lib/firebase';
@@ -853,6 +854,11 @@ export default function Admin() {
                                                             >
                                                                 {usr.tier || 'free'}
                                                             </button>
+                                                            {usr.tier === 'vip' && usr.vipUntil && (
+                                                                <span className="text-[9px] text-zinc-500 font-mono block mt-1">
+                                                                    EXP: {new Date(usr.vipUntil).toLocaleDateString('th-TH')}
+                                                                </span>
+                                                            )}
                                                             {usr.role !== 'user' && (
                                                                 <span className="px-3 py-1.5 bg-red-600/10 text-red-500 border border-red-500/20 text-[10px] font-black rounded-xl uppercase tracking-widest flex items-center gap-1.5">
                                                                     <ShieldCheck size={12} />
@@ -1150,6 +1156,62 @@ export default function Admin() {
                                                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white font-bold focus:border-orange-500 outline-none transition-all"
                                             />
                                             <p className="text-[10px] text-zinc-500 mt-2">* จำนวนเหรียญที่จะแจกให้ผู้ใช้ที่สมัครสมาชิกใหม่ครั้งแรก</p>
+                                        </div>
+
+                                        <div className="bg-zinc-950/50 border border-zinc-800 p-6 rounded-2xl">
+                                            <label className="flex items-center gap-2 text-sm font-bold text-white mb-4">
+                                                <Award size={16} className="text-yellow-500" />
+                                                VIP Settings (ตั้งค่าระบบ VIP)
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-xs text-zinc-400 mb-2 block">ราคา (เหรียญ)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={systemSettings?.vipPrice || 300}
+                                                        onChange={(e) => setSystemSettings({ ...systemSettings, vipPrice: parseInt(e.target.value) })}
+                                                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white font-bold focus:border-orange-500 outline-none transition-all"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-zinc-400 mb-2 block">ระยะเวลา (วัน)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={systemSettings?.vipDurationDays || 30}
+                                                        onChange={(e) => setSystemSettings({ ...systemSettings, vipDurationDays: parseInt(e.target.value) })}
+                                                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white font-bold focus:border-orange-500 outline-none transition-all"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-zinc-500 mt-2">* กำหนดราคาสมัคร VIP และจำนวนวันที่จะได้รับสิทธิ์</p>
+                                        </div>
+
+                                        <div className="bg-zinc-950/50 border border-zinc-800 p-6 rounded-2xl">
+                                            <label className="flex items-center gap-2 text-sm font-bold text-white mb-4">
+                                                <Award size={16} className="text-emerald-500" />
+                                                Daily Reward (รับเหรียญรายวัน)
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-xs text-zinc-400 mb-2 block">ทั่วไป (เหรียญ)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={systemSettings?.dailyRewardFree || 1}
+                                                        onChange={(e) => setSystemSettings({ ...systemSettings, dailyRewardFree: parseInt(e.target.value) })}
+                                                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white font-bold focus:border-orange-500 outline-none transition-all"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-zinc-400 mb-2 block">VIP (เหรียญ)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={systemSettings?.dailyRewardVip || 5}
+                                                        onChange={(e) => setSystemSettings({ ...systemSettings, dailyRewardVip: parseInt(e.target.value) })}
+                                                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white font-bold focus:border-orange-500 outline-none transition-all"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-zinc-500 mt-2">* กำหนดจำนวนเหรียญที่จะได้รับเมื่อกดเช็คอินรายวัน</p>
                                         </div>
 
                                         <div className="bg-zinc-950/50 border border-zinc-800 p-6 rounded-2xl">

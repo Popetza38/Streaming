@@ -3,15 +3,15 @@ import express from 'express'
 import axios from 'axios'
 
 // Import local Vercel serverless functions for dev environment
-import authHandler from './api/auth.js'
-import membershipHandler from './api/membership.js'
-import historyHandler from './api/history.js'
-import adminHandler from './api/admin.js'
-import carouselHandler from './api/carousel.js'
-import userHandler from './api/user.js'
-import paymentsHandler from './api/payments.js'
-import couponsHandler from './api/coupons.js'
-import reviewsHandler from './api/reviews.js'
+import authHandler from './backend/auth.js'
+import membershipHandler from './backend/membership.js'
+import historyHandler from './backend/history.js'
+import adminHandler from './backend/admin.js'
+import carouselHandler from './backend/carousel.js'
+import userHandler from './backend/user.js'
+import paymentsHandler from './backend/payments.js'
+import couponsHandler from './backend/coupons.js'
+import reviewsHandler from './backend/reviews.js'
 
 const app = express()
 

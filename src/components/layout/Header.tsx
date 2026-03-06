@@ -1,4 +1,5 @@
-import { Search, Users, LogIn, LogOut, Shield, Coins } from 'lucide-react'
+import { Search, Users, LogIn, LogOut, Shield, Settings as SettingsIcon, Crown } from 'lucide-react'
+import Swal from 'sweetalert2'
 import { Link, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useLanguage, languages } from '../../store/language'
@@ -15,6 +16,7 @@ export default function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [activeUsers, setActiveUsers] = useState(0);
   const { user, profile, signOut } = useAuth();
+  const isVip = profile?.tier === 'vip' && (profile?.vipUntil || 0) > Date.now();
 
   useEffect(() => {
     setActiveUsers(Math.floor(Math.random() * 300) + 1200);
@@ -125,18 +127,6 @@ export default function Header() {
             )}
           </div>
 
-          {/* Coins Display */}
-          {user && profile && (
-            <Link
-              to="/profile"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-yellow-500/10 border border-yellow-500/20 rounded-xl hover:bg-yellow-500/20 transition-all group"
-            >
-              <Coins size={14} className="text-yellow-500 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-bold text-yellow-500 tabular-nums">
-                {profile.coins.toLocaleString()}
-              </span>
-            </Link>
-          )}
 
           {!isSearchPage && (
             <Link to="/search" className="p-2.5 hover:bg-zinc-800 active:bg-zinc-700 rounded-xl transition-colors">
@@ -152,8 +142,17 @@ export default function Header() {
                 className="p-1 sm:p-1.5 hover:bg-zinc-800 active:bg-zinc-700 rounded-xl transition-colors"
                 title="Profile"
               >
-                <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-white text-sm font-bold uppercase shadow-sm border border-red-500/50">
-                  {profile?.username?.charAt(0) || user.email?.charAt(0) || 'U'}
+                <div className={`relative w-8 h-8 rounded-full bg-red-600 flex items-center justify-center text-white text-sm font-bold uppercase shadow-sm border ${isVip ? 'border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]' : 'border-red-500/50'}`}>
+                  {profile?.avatar ? (
+                    <img src={profile.avatar} alt="" className="w-full h-full object-cover rounded-full" />
+                  ) : (
+                    profile?.username?.charAt(0) || user.email?.charAt(0) || 'U'
+                  )}
+                  {isVip && (
+                    <div className="absolute -top-2.5 -right-1 bg-gradient-to-tr from-yellow-600 to-yellow-400 p-0.5 rounded-md shadow-lg border border-yellow-300/50 text-black">
+                      <Crown size={8} fill="black" />
+                    </div>
+                  )}
                 </div>
               </button>
               {showUserMenu && (
@@ -174,8 +173,43 @@ export default function Header() {
                         <span>Admin Dashboard</span>
                       </Link>
                     )}
+                    <Link
+                      to="/profile"
+                      onClick={() => setShowUserMenu(false)}
+                      className="w-full text-left px-4 py-3 hover:bg-zinc-800 active:bg-zinc-700 transition-colors flex items-center gap-3 text-sm text-white"
+                    >
+                      <SettingsIcon size={16} className="text-zinc-400" />
+                      <span>Account Settings</span>
+                    </Link>
                     <button
-                      onClick={() => { signOut(); setShowUserMenu(false); }}
+                      onClick={async () => {
+                        setShowUserMenu(false);
+                        const result = await Swal.fire({
+                          title: 'ยืนยันการออกจากระบบ',
+                          text: 'คุณต้องการออกจากระบบใช่หรือไม่?',
+                          icon: 'question',
+                          showCancelButton: true,
+                          confirmButtonColor: '#ef4444',
+                          cancelButtonColor: '#3f3f46',
+                          confirmButtonText: 'ออกจากระบบ',
+                          cancelButtonText: 'ยกเลิก',
+                          background: '#18181b',
+                          color: '#fff'
+                        });
+                        if (result.isConfirmed) {
+                          await signOut();
+                          Swal.fire({
+                            icon: 'success',
+                            title: 'ออกจากระบบสำเร็จ',
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false,
+                            timer: 2000,
+                            background: '#18181b',
+                            color: '#fff'
+                          });
+                        }
+                      }}
                       className="w-full text-left px-4 py-3 hover:bg-zinc-800 active:bg-zinc-700 transition-colors flex items-center gap-3 text-sm text-red-500 border-t border-zinc-800/50"
                     >
                       <LogOut size={16} />

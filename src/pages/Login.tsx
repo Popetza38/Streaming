@@ -72,7 +72,7 @@ export default function Login() {
             navigate('/');
         } catch (error: any) {
             let message = error.message;
-            if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
                 message = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
             } else if (error.code === 'auth/email-already-in-use') {
                 message = 'อีเมลนี้ถูกใช้งานแล้ว';
@@ -158,23 +158,23 @@ export default function Login() {
                     </button>
                 </form>
 
-                <div className="mt-4 flex flex-col gap-3">
-                    <button
-                        onClick={() => {
-                            const { signInWithGoogle } = useAuth();
-                            signInWithGoogle().catch(() => { });
-                        }}
-                        className="w-full bg-white hover:bg-zinc-100 text-black font-semibold py-3 rounded-xl transition-all flex items-center justify-center gap-3 border border-zinc-200 shadow-sm"
-                    >
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-                        {isLogin ? 'เข้าสู่ระบบด้วย Google' : 'สมัครสมาชิกด้วย Google'}
-                    </button>
+                <div className="mt-6 flex flex-col gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="h-px bg-zinc-800 flex-1"></div>
+                        <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider">หรือ</span>
+                        <div className="h-px bg-zinc-800 flex-1"></div>
+                    </div>
+
+                    <p className="text-zinc-400 text-center text-sm mt-2">
+                        {isLogin ? 'ยังไม่มีบัญชีใช่หรือไม่?' : 'มีบัญชีอยู่แล้วใช่หรือไม่?'}
+                    </p>
 
                     <button
                         onClick={() => setIsLogin(!isLogin)}
-                        className="text-sm text-zinc-400 hover:text-white transition-colors text-center"
+                        type="button"
+                        className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3.5 rounded-xl transition-all border border-zinc-700 hover:border-zinc-500 shadow-lg mb-2"
                     >
-                        {isLogin ? 'ยังไม่มีบัญชี? สมัครสมาชิกที่นี่' : 'มีบัญชีอยู่แล้ว? เข้าสู่ระบบ'}
+                        {isLogin ? 'สมัครสมาชิกใหม่ที่นี่' : 'เข้าสู่ระบบบัญชีของคุณ'}
                     </button>
                 </div>
             </div>

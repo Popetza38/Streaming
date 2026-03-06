@@ -16,7 +16,7 @@ interface AuthProfile {
 interface AuthContextType {
     user: User | null;
     profile: AuthProfile | null;
-    settings: { welcomeBonus: number, maintenanceMode: boolean, announcement: string } | null;
+    settings: { welcomeBonus: number, maintenanceMode: boolean, announcement: string, vipPrice: number, vipDurationDays: number, dailyRewardFree: number, dailyRewardVip: number } | null;
     isLoading: boolean;
     signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
@@ -36,7 +36,7 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<AuthProfile | null>(null);
-    const [settings, setSettings] = useState<{ welcomeBonus: number, maintenanceMode: boolean, announcement: string } | null>(null);
+    const [settings, setSettings] = useState<{ welcomeBonus: number, maintenanceMode: boolean, announcement: string, vipPrice: number, vipDurationDays: number, dailyRewardFree: number, dailyRewardVip: number } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchSettings = async () => {

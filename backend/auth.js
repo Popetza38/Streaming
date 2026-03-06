@@ -1,5 +1,13 @@
 import { adminAuth, adminDb } from './firebase-admin.js';
 
+const toMs = (val) => {
+    if (!val) return null;
+    if (typeof val === 'number') return val;
+    if (val.toMillis) return val.toMillis();
+    if (val._seconds) return val._seconds * 1000;
+    return new Date(val).getTime() || null;
+};
+
 export default async function handler(req, res) {
     // CORS setup
     res.setHeader('Access-Control-Allow-Credentials', true);
@@ -23,7 +31,7 @@ export default async function handler(req, res) {
             // Public Settings fetching (No token required)
             if (!authHeader || !authHeader.startsWith('Bearer ')) {
                 // Fetch global settings (maintenance mode, announcement, etc.)
-                let globalSettings = { welcomeBonus: 50, maintenanceMode: false, announcement: "" };
+                let globalSettings = { welcomeBonus: 50, maintenanceMode: false, announcement: "", vipPrice: 300, vipDurationDays: 30, dailyRewardFree: 1, dailyRewardVip: 5 };
                 try {
                     const settingsDoc = await adminDb.collection('settings').doc('global').get();
                     if (settingsDoc.exists) {
@@ -55,7 +63,7 @@ export default async function handler(req, res) {
                 const userData = userDoc.exists ? userDoc.data() : {};
 
                 // Fetch global settings (maintenance mode, announcement, etc.)
-                let globalSettings = { welcomeBonus: 50, maintenanceMode: false, announcement: "" };
+                let globalSettings = { welcomeBonus: 50, maintenanceMode: false, announcement: "", vipPrice: 300, vipDurationDays: 30, dailyRewardFree: 1, dailyRewardVip: 5 };
                 try {
                     const settingsDoc = await adminDb.collection('settings').doc('global').get();
                     if (settingsDoc.exists) {
@@ -77,7 +85,8 @@ export default async function handler(req, res) {
                         role: userData.role || 'user',
                         tier: userData.tier || 'free',
                         coins: userData.coins || 0,
-                        avatar: userData.avatar || decodedToken.picture || ''
+                        avatar: userData.avatar || decodedToken.picture || '',
+                        vipUntil: toMs(userData.vipUntil)
                     },
                     settings: globalSettings
                 });

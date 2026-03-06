@@ -1,5 +1,13 @@
 import { adminAuth, adminDb } from './firebase-admin.js';
 
+const toMs = (val) => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    if (val.toMillis) return val.toMillis();
+    if (val._seconds) return val._seconds * 1000;
+    return new Date(val).getTime() || 0;
+};
+
 // Helper to authenticate request
 async function authenticate(req) {
     const authHeader = req.headers.authorization;
@@ -41,7 +49,8 @@ export default async function handler(req, res) {
             // Check User VIP Status
             const userDoc = await adminDb.collection('users').doc(uid).get();
             const userData = userDoc.exists ? userDoc.data() : {};
-            const isVip = userData.tier === 'vip' && (!userData.vipUntil || userData.vipUntil > Date.now());
+            const vipUntilMs = toMs(userData.vipUntil);
+            const isVip = userData.tier === 'vip' && (vipUntilMs === 0 || vipUntilMs > Date.now());
 
             let hasPurchased = false;
 
