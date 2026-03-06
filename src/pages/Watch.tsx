@@ -1,13 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Share2, Heart } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { usePlatform } from '../store/platform';
 import type { Platform } from '../store/platform';
 import { useWatchHistory } from '../store/watchHistory';
-import { useWatchData } from '../hooks/useDramas';
+import { useWatchlist } from '../store/watchlist';
+import { useWatchData, useDramaLikes } from '../hooks/useDramas';
 import VideoPlayer from '../components/VideoPlayer';
 import { usePageMeta } from '../hooks/usePageMeta';
+import { useMembership } from '../hooks/useMembership';
+import { useAuth } from '../contexts/AuthContext';
+import MembershipModal from '../components/MembershipModal';
+import ReviewSection from '../components/ReviewSection';
+import { auth } from '@/lib/firebase';
 
 const Watch = () => {
   const { id } = useParams<{ id: string }>();
@@ -17,8 +23,11 @@ const Watch = () => {
   const [initialTime, setInitialTime] = useState(0);
   const { platform, setPlatform } = usePlatform();
   const { save, getItem } = useWatchHistory();
+  const { toggle: toggleWatchlist, contains: isInWatchlist } = useWatchlist();
   const saveTimerRef = useRef<ReturnType<typeof setInterval>>();
   const lastTimeRef = useRef({ time: 0, duration: 0 });
+  const [showMembershipModal, setShowMembershipModal] = useState(false);
+  const { user, profile } = useAuth();
 
   // Compute effective platform synchronously from URL param
   const validPlatforms: Platform[] = ['dramabox', 'shortmax', 'shortbox', 'flextv', 'dramapops'];
@@ -32,7 +41,41 @@ const Watch = () => {
     }
   }, [effectivePlatform]);
 
-  const { watchData, chapters, totalEpisodes, loading } = useWatchData(id, currentChapter, effectivePlatform);
+  const { watchData, chapters, totalEpisodes, loading: watchLoading } = useWatchData(id, currentChapter, effectivePlatform);
+  const { likes } = useDramaLikes(id);
+  const { hasPurchased, recordView, unlockDrama, loading: membershipLoading } = useMembership(id, effectivePlatform);
+  const [unlockLoading, setUnlockLoading] = useState(false);
+
+  const handlePurchase = async () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    setUnlockLoading(true);
+    const result = await unlockDrama(10); // Standard price 10 coins
+    setUnlockLoading(false);
+
+    if (result.success) {
+      Swal.fire({
+        icon: 'success',
+        title: 'ปลดล็อกสำเร็จ!',
+        text: 'ขอให้สนุกกับการรับชมครับ',
+        timer: 2000,
+        showConfirmButton: false,
+        background: '#18181b',
+        color: '#fff'
+      });
+    } else {
+      Swal.fire({
+        icon: 'error',
+        title: 'ปลดล็อกไม่สำเร็จ',
+        text: result.error || 'เกิดข้อผิดพลาดบางอย่าง',
+        background: '#18181b',
+        color: '#fff'
+      });
+    }
+  };
 
   usePageMeta(
     watchData ? `${watchData.name} EP ${currentChapter}` : 'Loading...',
@@ -50,39 +93,83 @@ const Watch = () => {
     }
   }, [id]);
 
+  // Record viewing history to Supabase when viewing a new chapter
+  useEffect(() => {
+    if (user && watchData && id && currentChapter <= 10) {
+      recordView(currentChapter);
+    }
+  }, [currentChapter, watchData, user, id]);
+
+  // Check 10 episodes limit
+  useEffect(() => {
+    if (currentChapter > 10 && !hasPurchased && !membershipLoading) {
+      setShowMembershipModal(true);
+    } else {
+      setShowMembershipModal(false);
+    }
+  }, [currentChapter, hasPurchased, membershipLoading]);
+
   // Save progress every 5 seconds
   useEffect(() => {
+    const syncToBackend = async (data: any) => {
+      if (!user) return;
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        await fetch('/api/user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            action: 'update_history',
+            dramaId: id,
+            dramaData: data
+          })
+        });
+      } catch (e) {
+        console.error('History sync failed:', e);
+      }
+    };
+
     saveTimerRef.current = setInterval(() => {
       if (!id || !watchData || lastTimeRef.current.time <= 0) return;
-      save({
+
+      const urlCover = searchParams.get('cw');
+      const historyData = {
         bookId: id,
         bookName: watchData.name,
-        cover: watchData.cover,
+        cover: watchData.cover || urlCover || '',
         episode: currentChapter,
         totalEpisodes: totalEpisodes,
         videoTime: lastTimeRef.current.time,
         videoDuration: lastTimeRef.current.duration,
         platform,
-      });
+      };
+      save(historyData);
+      syncToBackend(historyData);
     }, 5000);
 
     return () => {
       if (saveTimerRef.current) clearInterval(saveTimerRef.current);
       // Save on unmount
       if (id && watchData && lastTimeRef.current.time > 0) {
-        save({
+        const urlCover = searchParams.get('cw');
+        const historyData = {
           bookId: id,
           bookName: watchData.name,
-          cover: watchData.cover,
+          cover: watchData.cover || urlCover || '',
           episode: currentChapter,
           totalEpisodes: totalEpisodes,
           videoTime: lastTimeRef.current.time,
           videoDuration: lastTimeRef.current.duration,
           platform,
-        });
+        };
+        save(historyData);
+        syncToBackend(historyData);
       }
     };
-  }, [id, watchData, currentChapter, totalEpisodes, save]);
+  }, [id, watchData, currentChapter, totalEpisodes, save, user]);
 
   const handleTimeUpdate = useCallback((time: number, dur: number) => {
     lastTimeRef.current = { time, duration: dur };
@@ -151,7 +238,7 @@ const Watch = () => {
   };
 
   useEffect(() => {
-    if (loading) {
+    if (watchLoading || membershipLoading) {
       Swal.fire({
         title: 'กำลังโหลดข้อมูล...',
         allowOutsideClick: false,
@@ -169,10 +256,10 @@ const Watch = () => {
         Swal.close();
       }
     }
-  }, [loading]);
+  }, [watchLoading, membershipLoading]);
 
   if (!watchData) {
-    if (loading) return null;
+    if (watchLoading) return null;
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-center">
@@ -208,13 +295,13 @@ const Watch = () => {
       {/* Main Layout */}
       <div className="pt-12 sm:pt-14">
         <div className="lg:flex lg:h-[calc(100vh-56px)]">
-          <div className="lg:flex-1 lg:min-w-0 lg:flex lg:items-center lg:justify-center lg:bg-black">
+          <div className="lg:flex-1 lg:min-w-0 lg:flex lg:items-center lg:justify-center lg:bg-black relative">
             <div className="w-full lg:h-full lg:flex lg:items-center lg:justify-center">
-              <div className="w-full max-w-[500px] mx-auto lg:max-w-none lg:h-full">
+              <div className={`w-full max-w-[500px] mx-auto lg:max-w-none lg:h-full transition-all ${showMembershipModal ? 'blur-md pointer-events-none opacity-50' : ''}`}>
                 <VideoPlayer
                   src={getVideoSrc()}
                   poster={watchData.cover}
-                  autoPlay
+                  autoPlay={!showMembershipModal}
                   hasNext={currentChapter < totalEpisodes}
                   hasPrevious={currentChapter > 1}
                   onNext={handleNext}
@@ -233,6 +320,14 @@ const Watch = () => {
                 />
               </div>
             </div>
+
+            <MembershipModal
+              isOpen={showMembershipModal}
+              onClose={() => handlePrevious()}
+              onPurchase={handlePurchase}
+              userCoins={profile?.coins || 0}
+              loading={unlockLoading}
+            />
           </div>
 
           <div className="lg:w-[360px] xl:w-[400px] lg:border-l lg:border-zinc-800 lg:overflow-y-auto lg:flex-shrink-0">
@@ -245,13 +340,53 @@ const Watch = () => {
                       Episode {currentChapter} of {totalEpisodes}
                     </span>
                   </div>
-                  <button
-                    onClick={handleShare}
-                    className="p-2 sm:p-2.5 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 rounded-xl transition-all flex-shrink-0 mt-1"
-                    title="Share"
-                  >
-                    <Share2 size={18} className="text-zinc-300" />
-                  </button>
+                  <div className="flex items-center gap-2 mt-1">
+                    <button
+                      onClick={() => {
+                        if (!id || !watchData) return;
+                        toggleWatchlist({
+                          id: id,
+                          title: watchData.name,
+                          image: watchData.cover,
+                          addedAt: new Date().toISOString()
+                        });
+                        // Also sync to backend
+                        if (user) {
+                          auth.currentUser?.getIdToken().then(token => {
+                            fetch('/api/user', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                              },
+                              body: JSON.stringify({
+                                action: isInWatchlist(id) ? 'remove_watchlist' : 'add_watchlist',
+                                dramaId: id,
+                                dramaData: {
+                                  title: watchData.name,
+                                  image: watchData.cover
+                                }
+                              })
+                            });
+                          });
+                        }
+                      }}
+                      className={`p-2 sm:p-2.5 rounded-xl transition-all flex-shrink-0 border flex items-center gap-1.5 ${isInWatchlist(id || '') ? 'bg-red-500/10 border-red-500/50 text-red-500' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}
+                      title="Add to List"
+                    >
+                      <Heart size={18} fill={isInWatchlist(id || '') ? 'currentColor' : 'none'} />
+                      {effectivePlatform === 'dramabite' && likes > 0 && (
+                        <span className="text-xs font-bold">{likes}</span>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleShare}
+                      className="p-2 sm:p-2.5 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 border border-zinc-700 rounded-xl transition-all flex-shrink-0"
+                      title="Share"
+                    >
+                      <Share2 size={18} className="text-zinc-300" />
+                    </button>
+                  </div>
                 </div>
                 {watchData.summary && (
                   <p className="text-xs sm:text-sm text-zinc-300 line-clamp-3 mt-2">
@@ -302,8 +437,11 @@ const Watch = () => {
             </div>
           </div>
         </div>
+
+        {/* Rating & Reviews Section */}
+        <ReviewSection dramaId={id} />
       </div>
-    </div >
+    </div>
   );
 };
 

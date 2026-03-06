@@ -1,12 +1,16 @@
 {
-    "name": "DramaPop",
+    "name": "DramaPop – ดูซีรีส์สั้นออนไลน์",
     "short_name": "DramaPop",
-    "description": "Watch free short dramas online",
+    "description": "รวมซีรีส์สั้นจากทุกแพลตฟอร์ม ดูฟรี พากไทย ซับไทย อัปเดตทุกวัน",
     "start_url": "/",
     "display": "standalone",
     "orientation": "portrait",
     "background_color": "#09090b",
     "theme_color": "#09090b",
+    "categories": [
+        "entertainment",
+        "video"
+    ],
     "icons": [
         {
             "src": "/icon-192.png",

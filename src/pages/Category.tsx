@@ -4,16 +4,19 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '../store/language';
 import { usePlatform } from '../store/platform';
 import { normalizeDramaList, extractList, type NormalizedDrama } from '../utils/normalize';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 interface Tag {
-  tagId: number;
+  tagId: string | number;
   tagName: string;
 }
 
 const Category = () => {
-  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  usePageMeta('Categories');
+  const [selectedCategory, setSelectedCategory] = useState<string | number | null>(null);
   const [dramas, setDramas] = useState<NormalizedDrama[]>([]);
   const [categories, setCategories] = useState<Tag[]>([]);
+  const [allSections, setAllSections] = useState<any[]>([]); // To store DramaBite sections
   const [loading, setLoading] = useState(true);
   const { lang } = useLanguage();
   const { platform } = usePlatform();
@@ -22,15 +25,42 @@ const Category = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        if (platform === 'shortmax') {
-          // ShortMax doesn't have a classify/tag system — use hardcoded genres
+        if (platform === 'shortmax' || platform === 'fundrama') {
+          // ShortMax and FunDrama don't have a classify/tag system — use hardcoded genres
           const defaultTags: Tag[] = [
-            { tagId: 1, tagName: 'Romance' },
-            { tagId: 2, tagName: 'VIP' },
-            { tagId: 3, tagName: 'Latest' },
+            { tagId: 1, tagName: 'Latest' },
+            { tagId: 2, tagName: 'Popular' }
           ];
           setCategories(defaultTags);
           setSelectedCategory(defaultTags[0].tagId);
+        } else if (platform === 'dramabite') {
+          // DramaBite: Use both recommend sections and languages
+          const [recRes, langRes] = await Promise.all([
+            fetch(`/api/v1/recommend?lang=${lang}&platform=dramabite`),
+            fetch(`/api/v1/languages?platform=dramabite`)
+          ]);
+          const sections = await recRes.json();
+          const langsData = await langRes.json();
+
+          let combinedTags: Tag[] = [];
+          if (Array.isArray(sections)) {
+            setAllSections(sections);
+            combinedTags.push(...sections.map((s: any) => ({
+              tagId: `section_${s.category}`,
+              tagName: s.category
+            })));
+          }
+          if (Array.isArray(langsData)) {
+            combinedTags.push(...langsData.map((l: any) => ({
+              tagId: `lang_${l.code}`,
+              tagName: l.name
+            })));
+          }
+
+          setCategories(combinedTags);
+          if (combinedTags.length > 0) {
+            setSelectedCategory(combinedTags[0].tagId);
+          }
         } else {
           const path = platform === 'flextv' ? '/api/tabs/popular'
             : platform === 'dramapops' ? '/api/dramas/popular'
@@ -75,10 +105,37 @@ const Category = () => {
     const fetchCategoryDramas = async () => {
       setLoading(true);
       try {
+        if (platform === 'dramabite') {
+          const catId = String(selectedCategory);
+          if (catId.startsWith('section_')) {
+            const sectionName = catId.replace('section_', '');
+            const section = allSections.find(s => s.category === sectionName);
+            if (section && Array.isArray(section.dramas)) {
+              setDramas(normalizeDramaList(section.dramas, platform));
+            } else {
+              setDramas([]);
+            }
+          } else if (catId.startsWith('lang_')) {
+            const langCode = catId.replace('lang_', '');
+            const response = await fetch(`/api/v1/dramas?lang=${langCode}&platform=dramabite&page=0`);
+            const data = await response.json();
+            setDramas(normalizeDramaList(extractList(data, platform), platform));
+          } else {
+            const response = await fetch(`/api/v1/dramas?platform=dramabite&page=0`);
+            const data = await response.json();
+            setDramas(normalizeDramaList(extractList(data, platform), platform));
+          }
+          setLoading(false);
+          return;
+        }
+
         let url: string;
         if (platform === 'shortmax') {
           // ShortMax uses foryou or home for lists as feed is unavailable
           url = `/api/foryou?page=${selectedCategory}&lang=${lang}&platform=shortmax`;
+        } else if (platform === 'fundrama') {
+          // FunDrama uses /api/dramas for all lists
+          url = `/api/dramas?page=${typeof selectedCategory === 'number' ? selectedCategory - 1 : 0}&lang=${lang}&platform=fundrama`;
         } else if (platform === 'flextv') {
           url = `/api/tabs/popular?lang=${lang}&platform=flextv`;
         } else if (platform === 'dramapops') {
@@ -145,7 +202,7 @@ const Category = () => {
       {!loading && (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
           {dramas.map((drama) => (
-            <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}`} className="group">
+            <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}&cw=${encodeURIComponent(drama.cover || '')}`} className="group">
               <div className="aspect-[3/4] rounded-lg overflow-hidden mb-2">
                 <img
                   src={drama.cover}
@@ -158,7 +215,7 @@ const Category = () => {
               </h3>
               <div className="flex items-center gap-1 text-xs text-muted">
                 <Users size={12} />
-                <span>{drama.playCount || `${drama.episodes} ep`}</span>
+                <span>{drama.playCount ? drama.playCount : (drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing')}</span>
               </div>
             </Link>
           ))}

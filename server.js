@@ -1,27 +1,43 @@
+import 'dotenv/config'
 import express from 'express'
 import axios from 'axios'
-import { config } from 'dotenv'
 
-config()
+// Import local Vercel serverless functions for dev environment
+import authHandler from './api/auth.js'
+import membershipHandler from './api/membership.js'
+import historyHandler from './api/history.js'
+import adminHandler from './api/admin.js'
+import carouselHandler from './api/carousel.js'
+import userHandler from './api/user.js'
+import paymentsHandler from './api/payments.js'
+import couponsHandler from './api/coupons.js'
+import reviewsHandler from './api/reviews.js'
 
 const app = express()
 
-// ===== DramaBox credentials =====
-const _d = (s) => Buffer.from(s, 'base64').toString('utf-8')
-const DB_API_URL = _d(process.env.API_URL_E || '') || process.env.API_URL || ''
-const DB_TOKEN = _d(process.env.AUTH_TOKEN_E || '') || process.env.AUTH_TOKEN || ''
+const BASE_API_URL = process.env.BASE_API_URL || 'https://captain.sapimu.au';
+const API_TOKEN = process.env.API_TOKEN || '';
 
-// ===== ShortMax credentials =====
-const SM_API_URL = process.env.SM_API_URL || 'https://captain.sapimu.au/shortmax/api/v1'
-const SM_TOKEN = process.env.SM_AUTH_TOKEN || ''
+// Platform API URLs derived from BASE_API_URL
+const DB_API_URL = `${BASE_API_URL}/dramabox/api/v1`;
+const SM_API_URL = `${BASE_API_URL}/shortmax/api/v1`;
+const SB_API_URL = `${BASE_API_URL}/shortbox/api`;
+const FLEX_API_URL = `${BASE_API_URL}/flextv/api/v1`;
+const DP_API_URL = `${BASE_API_URL}/dramapops/api/v1`;
+const DB_BITE_API_URL = `${BASE_API_URL}/dramabite/api`;
 
-// ===== ShortBox credentials =====
-const SB_API_URL = process.env.SB_API_URL || 'https://captain.sapimu.au/shortbox/api'
-const SB_TOKEN = process.env.SB_API_TOKEN || ''
+// All platforms currently share the same token
+const DB_TOKEN = API_TOKEN;
+const SM_TOKEN = API_TOKEN;
+const SB_TOKEN = API_TOKEN;
+const FLEX_TOKEN = API_TOKEN;
+const DP_TOKEN = API_TOKEN;
+const DB_BITE_TOKEN = API_TOKEN;
 
 const DB_ALLOWED_PATHS = ['/foryou/', '/new/', '/rank/', '/search/', '/suggest/', '/classify', '/chapters/', '/watch/']
 const SM_ALLOWED_PATHS = ['/foryou', '/detail/', '/play/', '/search', '/feed/', '/home']
 const SB_ALLOWED_PATHS = ['/list', '/new-list', '/hot-search', '/detail/', '/episodes/', '/search']
+const DB_BITE_ALLOWED_PATHS = ['/v1/foryou', '/v1/dramas', '/v1/drama', '/v1/recommend', '/v1/search', '/v1/hot', '/v1/languages']
 
 // Lazy load keyDeriver only when needed
 let deriveKey, decryptSegment, keyCache
@@ -50,11 +66,25 @@ const loadKeyDeriver = async () => {
 // CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*')
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-  res.header('Access-Control-Allow-Headers', 'Content-Type')
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS, POST, PUT, DELETE, PATCH')
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
   if (req.method === 'OPTIONS') return res.sendStatus(200)
   next()
 })
+
+// Enable JSON body parsing for API routes
+app.use(express.json())
+
+// Mount serverless functions
+app.all('/api/auth', authHandler)
+app.all('/api/membership', membershipHandler)
+app.all('/api/history', historyHandler)
+app.all('/api/admin', adminHandler)
+app.all('/api/carousel', carouselHandler)
+app.all('/api/user', userHandler)
+app.all('/api/payments', paymentsHandler)
+app.all('/api/coupons', couponsHandler)
+app.all('/api/reviews', reviewsHandler)
 
 // ===== Image Proxy (for ShortBox cover images) =====
 app.get('/img', async (req, res) => {
@@ -326,6 +356,26 @@ app.use('/api', async (req, res) => {
         headers: {
           Authorization: `Bearer ${SM_TOKEN}`,
           'User-Agent': 'ShortMax-App/1.0'
+        }
+      })
+
+      res.set('Cache-Control', 'public, max-age=300')
+      res.json(response.data)
+    } catch (err) {
+      res.status(err.response?.status || 500).json({ error: err.message })
+    }
+  } else if (platform === 'dramabite') {
+    // DramaBite routing
+    if (!DB_BITE_ALLOWED_PATHS.some(p => path.startsWith(p))) {
+      return res.status(403).json({ error: 'Forbidden' })
+    }
+
+    try {
+      const response = await axios.get(`${DB_BITE_API_URL}${path}`, {
+        params,
+        headers: {
+          Authorization: `Bearer ${DB_BITE_TOKEN}`,
+          'User-Agent': 'DramaBite-App/1.0'
         }
       })
 

@@ -12,6 +12,22 @@ export interface NormalizedDrama {
     tags?: string[];
     corner?: { name: string; color: string };
     rank?: { hotCode: string };
+    language?: string;
+}
+
+/* ===== Detect Thai language from tags or name ===== */
+function detectLangFromTags(tags: any[], name?: string): string | undefined {
+    const thaiRegex = /[\u0E00-\u0E7F]/;
+    // Check tags
+    if (Array.isArray(tags)) {
+        for (const tag of tags) {
+            const label = typeof tag === 'string' ? tag : tag?.tagName ?? tag?.tag_name ?? '';
+            if (thaiRegex.test(label)) return 'th';
+        }
+    }
+    // Check name
+    if (name && thaiRegex.test(name)) return 'th';
+    return undefined;
 }
 
 export interface NormalizedWatchData {
@@ -41,6 +57,7 @@ export interface NormalizedChapter {
 export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
     if (platform === 'shortbox') {
         const imgUrl = raw.cover_image || raw.cover_image_thumb?.thumb || raw.cover_image_thumb || '';
+        const tags = (raw.tag_list ?? []).map((t: any) => typeof t === 'string' ? t : t?.tag_name ?? '');
         return {
             id: String(raw.shortplay_id ?? raw.drama_id ?? raw.id ?? ''),
             name: raw.title ?? '',
@@ -49,9 +66,10 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
             summary: raw.desc ?? '',
             playCount: '',
             score: undefined,
-            tags: (raw.tag_list ?? []).map((t: any) => typeof t === 'string' ? t : t?.tag_name ?? ''),
+            tags,
             corner: undefined,
             rank: undefined,
+            language: detectLangFromTags(raw.tag_list ?? [], raw.title),
         };
     }
 
@@ -67,11 +85,13 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
             tags: raw.tags ?? [],
             corner: raw.corner ?? undefined,
             rank: raw.rank ?? undefined,
+            language: detectLangFromTags(raw.tags ?? [], raw.name),
         };
     }
 
     if (platform === 'flextv') {
         const imgUrl = raw.cover || '';
+        const tags = (raw.tag_list ?? []).map((t: any) => typeof t === 'string' ? t : t?.tag_name ?? '');
         return {
             id: String(raw.series_id ?? raw.id ?? ''),
             name: raw.series_name ?? '',
@@ -80,26 +100,106 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
             summary: raw.description ?? '',
             playCount: raw.watch_num ?? '',
             score: undefined,
-            tags: (raw.tag_list ?? []).map((t: any) => typeof t === 'string' ? t : t?.tag_name ?? ''),
+            tags,
             corner: undefined,
             rank: undefined,
+            language: detectLangFromTags(raw.tag_list ?? [], raw.series_name),
         };
     }
 
     if (platform === 'dramapops') {
         const cover = raw.poster ?? raw.cover ?? (raw.poster_uri_prefix && raw.poster_uri_suffix ? `${raw.poster_uri_prefix}${raw.poster_uri_suffix}` : '');
         const watchCt = raw.watchCount ?? raw.watch_count;
+
+        let epCount = 0;
+        if (raw.totalEpisodes !== undefined) {
+            epCount = raw.totalEpisodes;
+        } else if (raw.episodes !== undefined) {
+            epCount = raw.episodes;
+        } else if (raw.episode_prices) {
+            epCount = Object.keys(raw.episode_prices).length;
+        } else {
+            // Homepage doesn't return anything. We set it to undefined or -1 so UI can hide it.
+            epCount = undefined as any;
+        }
+
         return {
             id: String(raw.id ?? raw.slug ?? ''),
             name: raw.title ?? raw.name ?? raw.movie_unique_title ?? '',
             cover: cover,
-            episodes: raw.totalEpisodes ?? (raw.episode_prices ? Object.keys(raw.episode_prices).length : 0) ?? raw.episodes ?? 0,
+            episodes: epCount,
             summary: raw.description ?? raw.summary ?? '',
             playCount: watchCt ? `${(watchCt / 1000).toFixed(1)}K` : '',
             score: raw.rating ?? undefined,
             tags: raw.tags ?? [],
             corner: undefined,
             rank: undefined,
+            language: detectLangFromTags(raw.tags ?? [], raw.title ?? raw.name),
+        };
+    }
+
+    if (platform === 'dramabite') {
+        const episodesProp = raw.episodes;
+        const isEpisodesArr = Array.isArray(episodesProp);
+
+        // If title is missing at top level, try to extract from the first episode's title
+        let name = raw.title ?? raw.name ?? '';
+        if (!name && isEpisodesArr && episodesProp.length > 0 && episodesProp[0].title) {
+            // "Drama Title-1" or "Drama Title-Episode 1" -> "Drama Title"
+            const parts = episodesProp[0].title.split('-');
+            if (parts.length > 1) {
+                const lastPart = parts[parts.length - 1].trim();
+                if (/^\d+$/.test(lastPart) || lastPart.toLowerCase().includes('episode')) {
+                    name = parts.slice(0, -1).join('-').trim();
+                } else {
+                    name = episodesProp[0].title.trim();
+                }
+            } else {
+                name = episodesProp[0].title.trim();
+            }
+        }
+
+        let epCount = 0;
+        if (typeof episodesProp === 'number') {
+            epCount = episodesProp;
+        } else if (isEpisodesArr) {
+            epCount = episodesProp.length;
+        } else if (raw.episodes_count) {
+            epCount = raw.episodes_count;
+        } else if (raw.total_episodes) {
+            epCount = raw.total_episodes;
+        }
+
+        return {
+            id: String(raw.id ?? ''),
+            name: name,
+            cover: raw.cover || raw.thumbnail || raw.poster || '',
+            episodes: epCount,
+            summary: raw.description ?? raw.synopsis ?? '',
+            playCount: raw.view_count ? (raw.view_count > 1000 ? `${(raw.view_count / 1000).toFixed(1)}K` : String(raw.view_count)) : '',
+            score: raw.rating ?? undefined,
+            tags: raw.genres ?? raw.tags ?? [],
+            corner: undefined,
+            rank: undefined,
+            language: detectLangFromTags(raw.genres ?? raw.tags ?? [], name),
+        };
+    }
+
+    if (platform === 'fundrama') {
+        const cover = raw.ptear ?? '';
+        let name = raw.nsin ?? '';
+        return {
+            id: String(raw.dshame ?? ''),
+            name: name,
+            cover: cover,
+            episodes: raw.eshe ?? 0,
+            summary: raw.dentra ?? '',
+            playCount: '',
+            score: undefined,
+            tags: [],
+            corner: undefined,
+            rank: undefined,
+            language: raw.lhomew ?? undefined,
         };
     }
 
@@ -115,6 +215,7 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
         tags: raw.tags ?? [],
         corner: raw.corner ?? undefined,
         rank: raw.rank ?? undefined,
+        language: detectLangFromTags(raw.tagDetails ?? raw.tags ?? [], raw.bookName),
     };
 }
 
@@ -168,6 +269,35 @@ export function extractList(data: any, platform: Platform): any[] {
             return d;
         }
         return [];
+    }
+    if (platform === 'dramabite') {
+        // DramaBite: returns a root-level array directly
+        if (Array.isArray(data)) {
+            // Recommend endpoint returns [{ category, dramas: [...] }]
+            if (data.length > 0 && data[0]?.dramas) {
+                const list: any[] = [];
+                data.forEach((section: any) => {
+                    if (Array.isArray(section.dramas)) list.push(...section.dramas);
+                });
+                return list;
+            }
+            // foryou, dramas, search: returns flat array of dramas
+            return data;
+        }
+        // Fallback for possible wrapped responses
+        const d = data?.data;
+        if (Array.isArray(d)) return d;
+        return [];
+    }
+    if (platform === 'fundrama') {
+        // rank/foryou: { data: { ddriv: { lsumm: [...] } } }
+        const lsumm = data?.data?.ddriv?.lsumm;
+        if (Array.isArray(lsumm)) return lsumm;
+        // search: { data: { results: [...] } }
+        const results = data?.data?.results;
+        if (Array.isArray(results)) return results;
+        // default fallback
+        return Array.isArray(data?.data) ? data.data : [];
     }
     // dramabox wraps in { success, data: { list } }
     return data?.data?.list || [];
@@ -257,6 +387,73 @@ export function normalizeWatchData(data: any, platform: Platform): NormalizedWat
         };
     }
 
+    if (platform === 'dramabite') {
+        // Episode response: { id, number, title, video: 'm3u8_url', validFor: 1800 }
+        const videoUrl = data?.video ?? data?.play_url ?? data?.video_url ?? data?.url ?? '';
+        let name = data?.episodeTitle ?? data?.dramaTitle ?? data?.title ?? '';
+        // If it's a detail object with episodes array
+        if (!name && data?.episodes?.length > 0) {
+            const epTitle = data.episodes[0].title || '';
+            const parts = epTitle.split('-');
+            if (parts.length > 1) {
+                const lastPart = parts[parts.length - 1].trim();
+                if (/^\d+$/.test(lastPart) || lastPart.toLowerCase().includes('episode')) {
+                    name = parts.slice(0, -1).join('-').trim();
+                } else {
+                    name = epTitle.trim();
+                }
+            } else {
+                name = epTitle.trim();
+            }
+        }
+
+        let cover = data?.cover || data?.thumbnail || data?.poster || '';
+
+        // If root cover is missing, try to get it from the first episode
+        if (!cover && data?.episodes?.[0]) {
+            const ep = data.episodes[0];
+            cover = ep.cover || ep.thumbnail || ep.poster || '';
+        }
+
+        return {
+            name: name,
+            cover: cover,
+            videoUrl,
+            summary: data?.description ?? data?.synopsis ?? '',
+            isHls: videoUrl.includes('.m3u8'),
+        };
+    }
+
+    if (platform === 'fundrama') {
+        const eclimEp = data?.eclimEp;
+        const ptitl = eclimEp?.ptitl || data?.fdar || [];
+
+        let videoUrl = '';
+        if (ptitl.length > 0) {
+            // Sort by Wsecto (height) or Dspee (resolution string like 1080P) if available
+            const sorted = [...ptitl].sort((a: any, b: any) => {
+                const heightA = a.Wsecto || parseInt(a.Dspee) || 0;
+                const heightB = b.Wsecto || parseInt(b.Dspee) || 0;
+                return heightB - heightA;
+            });
+            videoUrl = sorted[0]?.Mbrie || ptitl[0]?.Mbrie || '';
+        }
+
+        if (!videoUrl && data?.videoUrl) {
+            videoUrl = data.videoUrl;
+        } else if (!videoUrl && data?.url) {
+            videoUrl = data.url;
+        }
+
+        return {
+            name: data?.nsin ?? '',
+            cover: data?.ptear ?? '',
+            videoUrl,
+            summary: data?.dentra ?? '',
+            isHls: videoUrl.includes('.m3u8'),
+        };
+    }
+
     // dramabox
     return {
         name: data?.bookName ?? '',
@@ -314,6 +511,22 @@ export function normalizeChapters(data: any, platform: Platform, totalEpisodes?:
 
     if (platform === 'dramapops') {
         // DramaPops: generate episodes from totalEpisodes
+        const count = totalEpisodes ?? 0;
+        return Array.from({ length: count }, (_, i) => ({
+            id: String(i + 1),
+            index: i,
+        }));
+    }
+
+    if (platform === 'dramabite') {
+        // DramaBite: episodes come from drama detail as [{id, number, title, free}]
+        const episodes = data?.episodes || [];
+        if (Array.isArray(episodes) && episodes.length > 0) {
+            return episodes.map((ep: any) => ({
+                id: String(ep.id ?? ep.number ?? ''),
+                index: (ep.number ?? ep.id ?? 1) - 1,
+            }));
+        }
         const count = totalEpisodes ?? 0;
         return Array.from({ length: count }, (_, i) => ({
             id: String(i + 1),

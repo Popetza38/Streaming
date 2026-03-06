@@ -25,6 +25,10 @@ function apiProxyPlugin(): Plugin {
   let FLEX_API_TOKEN = ''
   let DP_API_URL = ''
   let DP_API_TOKEN = ''
+  let DB_BITE_API_URL = ''
+  let DB_BITE_API_TOKEN = ''
+  let FD_API_URL = ''
+  let FD_TOKEN = ''
 
   async function handleApiRequest(req: IncomingMessage, res: ServerResponse) {
     const reqUrl = req.url || ''
@@ -62,6 +66,18 @@ function apiProxyPlugin(): Plugin {
       headers = {
         'Authorization': `Bearer ${DP_API_TOKEN}`,
         'User-Agent': 'DramaPops-App/1.0',
+      }
+    } else if (platform === 'dramabite') {
+      targetUrl = `${DB_BITE_API_URL}${apiPath}${queryString}`
+      headers = {
+        'Authorization': `Bearer ${DB_BITE_API_TOKEN}`,
+        'User-Agent': 'DramaBite-App/1.0',
+      }
+    } else if (platform === 'fundrama') {
+      targetUrl = `${FD_API_URL}${apiPath}${queryString}`
+      headers = {
+        'Authorization': `Bearer ${FD_TOKEN}`,
+        'User-Agent': 'FunDrama-App/1.0',
       }
     } else {
       targetUrl = `${DB_API_URL}${apiPath}${queryString}`
@@ -254,18 +270,25 @@ function apiProxyPlugin(): Plugin {
     name: 'api-proxy',
     configResolved(config: ResolvedConfig) {
       const env = loadEnv(config.mode, config.root, '')
-      const decode = (s: string) => s ? Buffer.from(s, 'base64').toString('utf-8') : ''
-      DB_API_URL = decode(env.API_URL_E) || env.API_URL || ''
-      DB_TOKEN = decode(env.AUTH_TOKEN_E) || env.AUTH_TOKEN || ''
-      SM_API_URL = env.SM_API_URL || ''
-      SM_TOKEN = env.SM_AUTH_TOKEN || ''
-      SB_API_URL = env.SB_API_URL || ''
-      SB_TOKEN = env.SB_API_TOKEN || ''
-      FLEX_API_URL = env.FLEX_API_URL || ''
-      FLEX_API_TOKEN = env.FLEX_API_TOKEN || ''
-      DP_API_URL = env.DP_API_URL || ''
-      DP_API_TOKEN = env.DP_API_TOKEN || ''
-      console.log('[api-proxy] DB:', DB_API_URL ? '✅' : '❌', 'SM:', SM_API_URL ? '✅' : '❌', 'SB:', SB_API_URL ? '✅' : '❌', 'FLEX:', FLEX_API_URL ? '✅' : '❌', 'DP:', DP_API_URL ? '✅' : '❌')
+      const baseApiUrl = env.BASE_API_URL || 'https://captain.sapimu.au'
+      const apiToken = env.API_TOKEN || ''
+
+      DB_API_URL = `${baseApiUrl}/dramabox/api/v1`
+      SM_API_URL = `${baseApiUrl}/shortmax/api/v1`
+      SB_API_URL = `${baseApiUrl}/shortbox/api`
+      FLEX_API_URL = `${baseApiUrl}/flextv/api/v1`
+      DP_API_URL = `${baseApiUrl}/dramapops/api/v1`
+      DB_BITE_API_URL = `${baseApiUrl}/dramabite/api`
+      FD_API_URL = `${baseApiUrl}/fundrama/api/v1`
+
+      DB_TOKEN = apiToken
+      SM_TOKEN = apiToken
+      SB_TOKEN = apiToken
+      FLEX_API_TOKEN = apiToken
+      DP_API_TOKEN = apiToken
+      DB_BITE_API_TOKEN = apiToken
+      FD_TOKEN = apiToken
+      console.log('[api-proxy] DB:', DB_API_URL ? '✅' : '❌', 'SM:', SM_API_URL ? '✅' : '❌', 'SB:', SB_API_URL ? '✅' : '❌', 'FLEX:', FLEX_API_URL ? '✅' : '❌', 'DP:', DP_API_URL ? '✅' : '❌', 'FD:', FD_API_URL ? '✅' : '❌')
     },
     configureServer(server) {
       server.middlewares.use((
@@ -276,6 +299,11 @@ function apiProxyPlugin(): Plugin {
         const reqUrl = req.url || ''
 
         if (reqUrl.startsWith('/api/') || reqUrl.startsWith('/api?')) {
+          // Bypass specific custom routes so they can be handled by Vite's standard server.proxy
+          if (['/api/auth', '/api/membership', '/api/history', '/api/admin', '/api/carousel', '/api/user', '/api/payments', '/api/coupons', '/api/reviews'].some(p => reqUrl.startsWith(p))) {
+            return next()
+          }
+
           handleApiRequest(req, res).catch((err) => {
             console.error('[api-proxy] API error:', err.message)
             if (!res.headersSent) {
@@ -357,4 +385,17 @@ function apiProxyPlugin(): Plugin {
 export default defineConfig({
   plugins: [react(), apiProxyPlugin()],
   resolve: { alias: { '@': '/src' } },
+  server: {
+    proxy: {
+      '/api/auth': 'http://localhost:3000',
+      '/api/membership': 'http://localhost:3000',
+      '/api/history': 'http://localhost:3000',
+      '/api/admin': 'http://localhost:3000',
+      '/api/carousel': 'http://localhost:3000',
+      '/api/user': 'http://localhost:3000',
+      '/api/payments': 'http://localhost:3000',
+      '/api/coupons': 'http://localhost:3000',
+      '/api/reviews': 'http://localhost:3000',
+    }
+  }
 })

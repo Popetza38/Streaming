@@ -5,8 +5,10 @@ import { useLanguage } from '../store/language';
 import { usePlatform } from '../store/platform';
 import type { NormalizedDrama } from '../utils/normalize';
 import { normalizeDramaList, extractList } from '../utils/normalize';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const Search = () => {
+  usePageMeta('Search');
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [results, setResults] = useState<NormalizedDrama[]>([]);
@@ -15,6 +17,8 @@ const Search = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const { lang } = useLanguage();
   const { platform } = usePlatform();
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const categories = ['All', 'Korean', 'Chinese', 'Thai', 'Japanese'];
 
   // Fetch popular dramas on mount
   useEffect(() => {
@@ -27,6 +31,10 @@ const Search = () => {
           url = `/api/tabs/popular?lang=${lang}&platform=flextv`;
         } else if (platform === 'dramapops') {
           url = `/api/dramas/popular?limit=20&lang=${lang}&platform=dramapops`;
+        } else if (platform === 'dramabite') {
+          url = `/api/v1/recommend?page=0&lang=${lang}&platform=dramabite`;
+        } else if (platform === 'fundrama') {
+          url = `/api/dramas?page=0&lang=${lang}&platform=fundrama`;
         } else {
           url = `/api/rank/2?lang=${lang}&platform=${platform}`;
         }
@@ -60,8 +68,8 @@ const Search = () => {
       return;
     }
 
-    if (platform === 'shortmax') {
-      // ShortMax doesn't have suggest endpoint, skip
+    if (platform === 'shortmax' || platform === 'dramabite' || platform === 'fundrama') {
+      // ShortMax, DramaBite, and FunDrama don't have suggest endpoint, skip
       setShowSuggestions(false);
       return;
     }
@@ -90,8 +98,10 @@ const Search = () => {
         url = `/api/search?q=${encodeURIComponent(q)}&lang=${lang}&platform=shortmax`;
       } else if (platform === 'flextv') {
         url = `/api/search?q=${encodeURIComponent(q)}&lang=${lang}&platform=flextv`;
-      } else if (platform === 'dramapops') {
-        url = `/api/search?q=${encodeURIComponent(q)}&limit=30&lang=${lang}&platform=dramapops`;
+      } else if (platform === 'dramabite') {
+        url = `/api/v1/search?q=${encodeURIComponent(q)}&page=0&limit=30&lang=${lang}&platform=dramabite`;
+      } else if (platform === 'fundrama') {
+        url = `/api/search?q=${encodeURIComponent(q)}&keyword=${encodeURIComponent(q)}&page=0&lang=${lang}&platform=fundrama`;
       } else {
         url = `/api/search/${encodeURIComponent(q)}/1?lang=${lang}&pageSize=20&platform=${platform}`;
       }
@@ -99,7 +109,32 @@ const Search = () => {
       const response = await fetch(url);
       const data = await response.json();
       const list = extractList(data, platform);
-      setResults(normalizeDramaList(list, platform));
+      let normalized = normalizeDramaList(list, platform);
+
+      // Also search local database if on 'dramapops' or similar
+      try {
+        const localRes = await fetch(`/api/admin?type=dramas`);
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          const localMatches = localData.filter((d: any) =>
+            d.title.toLowerCase().includes(q.toLowerCase()) ||
+            (d.genre && d.genre.toLowerCase().includes(q.toLowerCase()))
+          ).map((d: any) => ({
+            id: d.id,
+            name: d.title,
+            cover: d.image,
+            category: d.category,
+            genre: d.genre,
+            score: 10, // Default for local
+            playCount: 'Local'
+          }));
+          normalized = [...localMatches, ...normalized];
+        }
+      } catch (e) {
+        console.error('Local search failed:', e);
+      }
+
+      setResults(normalized);
     } catch (error) {
       console.error('Failed to search:', error);
     } finally {
@@ -188,6 +223,19 @@ const Search = () => {
         )}
       </div>
 
+      {/* Category Chips */}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        {categories.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setSelectedCategory(cat)}
+            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${selectedCategory === cat ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-500 border border-zinc-800 hover:text-white'}`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-12">
@@ -202,29 +250,31 @@ const Search = () => {
             {results.length} results for "{query}"
           </h2>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-            {results.map((drama) => (
-              <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}`} className="group">
-                <div className="aspect-[3/4] rounded-lg overflow-hidden mb-2 bg-zinc-900">
-                  <img
-                    src={drama.cover}
-                    alt={drama.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                  />
-                </div>
-                <h3 className="text-xs font-medium line-clamp-2 mb-1 leading-tight">
-                  {drama.name}
-                </h3>
-                {drama.score != null && drama.score > 0 && (
-                  <div className="flex items-center gap-0.5 mb-0.5">
-                    <Star size={10} className="text-yellow-400 fill-yellow-400" />
-                    <span className="text-[10px] text-yellow-400 font-semibold">{drama.score.toFixed(1)}</span>
+            {results
+              .filter(d => selectedCategory === 'All' || (d as any).category === selectedCategory)
+              .map((drama) => (
+                <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}&cw=${encodeURIComponent(drama.cover || '')}`} className="group">
+                  <div className="aspect-[3/4] rounded-lg overflow-hidden mb-2 bg-zinc-900">
+                    <img
+                      src={drama.cover}
+                      alt={drama.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                    />
                   </div>
-                )}
-                <p className="text-xs text-muted">
-                  {drama.playCount || `${drama.episodes} ep`}
-                </p>
-              </Link>
-            ))}
+                  <h3 className="text-xs font-medium line-clamp-2 mb-1 leading-tight">
+                    {drama.name}
+                  </h3>
+                  {drama.score != null && drama.score > 0 && (
+                    <div className="flex items-center gap-0.5 mb-0.5">
+                      <Star size={10} className="text-yellow-400 fill-yellow-400" />
+                      <span className="text-[10px] text-yellow-400 font-semibold">{drama.score.toFixed(1)}</span>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted">
+                    {drama.playCount ? drama.playCount : (drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing')}
+                  </p>
+                </Link>
+              ))}
           </div>
         </div>
       )}
@@ -244,7 +294,7 @@ const Search = () => {
           <h2 className="text-sm font-semibold mb-3 text-zinc-300">Popular Searches</h2>
           <div className="space-y-3">
             {popularDramas.map((drama, index) => (
-              <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}`} className="card p-3.5 flex gap-3 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
+              <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}&cw=${encodeURIComponent(drama.cover || '')}`} className="card p-3.5 flex gap-3 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
                 <div className="relative flex-shrink-0">
                   <img
                     src={drama.cover}
@@ -270,7 +320,7 @@ const Search = () => {
                       </div>
                     )}
                     <p className="text-xs text-muted">
-                      {drama.playCount ? `${drama.playCount} views` : `${drama.episodes} episodes`}
+                      {drama.playCount ? `${drama.playCount} views` : (drama.episodes && drama.episodes > 0 ? `${drama.episodes} episodes` : 'Ongoing')}
                     </p>
                   </div>
                 </div>

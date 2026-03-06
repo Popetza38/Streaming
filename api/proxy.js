@@ -9,31 +9,34 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 // Decode obfuscated credentials
 const _d = (s) => Buffer.from(s, 'base64').toString('utf-8');
 
-// DramaBox
-const DB_API_URL = _d(process.env.API_URL_E || '') || process.env.API_URL || '';
-const DB_TOKEN = _d(process.env.AUTH_TOKEN_E || '') || process.env.AUTH_TOKEN || '';
+const BASE_API_URL = process.env.BASE_API_URL || 'https://captain.sapimu.au';
+const API_TOKEN = process.env.API_TOKEN || '';
 
-// ShortMax
-const SM_API_URL = process.env.SM_API_URL || 'https://captain.sapimu.au/shortmax/api/v1';
-const SM_TOKEN = process.env.SM_AUTH_TOKEN || '';
+// Platform API URLs derived from BASE_API_URL
+const DB_API_URL = `${BASE_API_URL}/dramabox/api/v1`;
+const SM_API_URL = `${BASE_API_URL}/shortmax/api/v1`;
+const SB_API_URL = `${BASE_API_URL}/shortbox/api`;
+const FLEX_API_URL = `${BASE_API_URL}/flextv/api/v1`;
+const DP_API_URL = `${BASE_API_URL}/dramapops/api/v1`;
+const DB_BITE_API_URL = `${BASE_API_URL}/dramabite/api`;
+const FD_API_URL = `${BASE_API_URL}/fundrama/api/v1`;
 
-// ShortBox
-const SB_API_URL = process.env.SB_API_URL || 'https://captain.sapimu.au/shortbox/api';
-const SB_TOKEN = process.env.SB_API_TOKEN || '';
-
-// FlexTV
-const FLEX_API_URL = process.env.FLEX_API_URL || 'https://captain.sapimu.au/flextv/api/v1';
-const FLEX_TOKEN = process.env.FLEX_API_TOKEN || '';
-
-// DramaPops
-const DP_API_URL = process.env.DP_API_URL || 'https://captain.sapimu.au/dramapops/api/v1';
-const DP_TOKEN = process.env.DP_API_TOKEN || '';
+// All platforms currently share the same token
+const DB_TOKEN = API_TOKEN;
+const SM_TOKEN = API_TOKEN;
+const SB_TOKEN = API_TOKEN;
+const FLEX_TOKEN = API_TOKEN;
+const DP_TOKEN = API_TOKEN;
+const DB_BITE_TOKEN = API_TOKEN;
+const FD_TOKEN = API_TOKEN;
 
 const DB_ALLOWED_PATHS = ['/foryou/', '/new/', '/rank/', '/search/', '/suggest/', '/classify', '/chapters/', '/watch/'];
 const SM_ALLOWED_PATHS = ['/foryou', '/detail', '/play', '/search', '/feed', '/home'];
 const SB_ALLOWED_PATHS = ['/list', '/new-list', '/hot-search', '/detail/', '/episodes/', '/search'];
 const FLEX_ALLOWED_PATHS = ['/tabs', '/series', '/play', '/search', '/languages'];
 const DP_ALLOWED_PATHS = ['/homepage', '/dramas', '/drama', '/search', '/languages', '/config'];
+const DB_BITE_ALLOWED_PATHS = ['/v1/foryou', '/v1/dramas', '/v1/drama', '/v1/recommend', '/v1/search', '/v1/hot', '/v1/languages', '/v1/drama/'];
+const FD_ALLOWED_PATHS = ['/foryou', '/dramas', '/drama', '/recommend', '/search', '/hot', '/languages', '/drama/'];
 
 export default async function handler(req, res) {
   // Enable CORS
@@ -314,6 +317,78 @@ export default async function handler(req, res) {
     } catch (err) {
       res.status(err.response?.status || 500).json({
         error: 'ShortMax API request failed',
+        details: err.message
+      });
+    }
+  } else if (platform === 'dramabite') {
+    // DramaBite routing
+    if (!DB_BITE_ALLOWED_PATHS.some(p => pathname.startsWith(p))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (!DB_BITE_TOKEN) {
+      return res.status(500).json({ error: 'DramaBite token not configured.' });
+    }
+
+    try {
+      const url = `${DB_BITE_API_URL}${pathname}${cleanQuery ? '?' + cleanQuery : ''}`;
+
+      if (apiCache.has(url) && apiCache.get(url).expiry > Date.now()) {
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(apiCache.get(url).data);
+      }
+
+      const response = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${DB_BITE_TOKEN}`,
+          'User-Agent': 'DramaBite-App/1.0'
+        }
+      });
+
+      apiCache.set(url, { data: response.data, expiry: Date.now() + CACHE_TTL });
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.setHeader('X-Cache', 'MISS');
+      res.json(response.data);
+    } catch (err) {
+      res.status(err.response?.status || 500).json({
+        error: 'DramaBite API request failed',
+        details: err.message
+      });
+    }
+  } else if (platform === 'fundrama') {
+    // FunDrama routing
+    if (!FD_ALLOWED_PATHS.some(p => pathname.startsWith(p))) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    if (!FD_TOKEN) {
+      return res.status(500).json({ error: 'FunDrama token not configured.' });
+    }
+
+    try {
+      const url = `${FD_API_URL}${pathname}${cleanQuery ? '?' + cleanQuery : ''}`;
+
+      if (apiCache.has(url) && apiCache.get(url).expiry > Date.now()) {
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('X-Cache', 'HIT');
+        return res.json(apiCache.get(url).data);
+      }
+
+      const response = await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${FD_TOKEN}`,
+          'User-Agent': 'FunDrama-App/1.0'
+        }
+      });
+
+      apiCache.set(url, { data: response.data, expiry: Date.now() + CACHE_TTL });
+      res.setHeader('Cache-Control', 'public, max-age=300');
+      res.setHeader('X-Cache', 'MISS');
+      res.json(response.data);
+    } catch (err) {
+      res.status(err.response?.status || 500).json({
+        error: 'FunDrama API request failed',
         details: err.message
       });
     }

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '../store/language';
 import { usePlatform } from '../store/platform';
 import { normalizeDramaList, extractList, type NormalizedDrama } from '../utils/normalize';
+import { usePageMeta } from '../hooks/usePageMeta';
 
 const rankTabs = [
   { id: 1, name: 'Trending', label: 'Trending' },
@@ -12,6 +13,7 @@ const rankTabs = [
 ];
 
 const Rank = () => {
+  usePageMeta('Rankings');
   const [activeTab, setActiveTab] = useState(1);
   const [dramas, setDramas] = useState<NormalizedDrama[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,13 +26,15 @@ const Rank = () => {
       try {
         let url: string;
         if (platform === 'shortmax') {
-          // ShortMax uses foryou endpoint for lists as feed is unavailable
           url = `/api/foryou?page=${activeTab}&lang=${lang}&platform=shortmax`;
         } else if (platform === 'flextv') {
           url = `/api/tabs/popular?lang=${lang}&platform=flextv`;
         } else if (platform === 'dramapops') {
-          const dpTypes = ['trending', 'popular', 'popular'];
-          url = `/api/dramas/${dpTypes[activeTab - 1]}?limit=30&lang=${lang}&platform=dramapops`;
+          url = `/api/dramas/popular?limit=20&lang=${lang}&platform=dramapops`;
+        } else if (platform === 'dramabite') {
+          url = `/api/v1/recommend?page=${activeTab - 1}&lang=${lang}&platform=dramabite`;
+        } else if (platform === 'fundrama') {
+          url = `/api/dramas?page=${activeTab - 1}&lang=${lang}&platform=fundrama`;
         } else {
           url = `/api/rank/${activeTab}?lang=${lang}&platform=${platform}`;
         }
@@ -93,7 +97,7 @@ const Rank = () => {
       {!loading && (
         <div className="space-y-3">
           {dramas.map((drama, index) => (
-            <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}`} className="block">
+            <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}&cw=${encodeURIComponent(drama.cover || '')}`} className="block">
               <div className="card p-3.5 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
                 <div className="flex gap-3">
                   <div className="relative flex-shrink-0">
@@ -128,7 +132,7 @@ const Rank = () => {
                         <Users size={11} />
                         <span>{drama.playCount || 'N/A'}</span>
                       </div>
-                      <span>{drama.episodes} ep</span>
+                      <span>{drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing'}</span>
                     </div>
 
                     {drama.tags && drama.tags.length > 0 && (

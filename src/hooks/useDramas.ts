@@ -48,6 +48,12 @@ export const useDramas = () => {
       path = '/api/tabs/popular';
     } else if (platform === 'dramapops') {
       path = '/api/homepage';
+    } else if (platform === 'dramabite') {
+      path = '/api/v1/foryou';
+      params.page = 0;
+    } else if (platform === 'fundrama') {
+      path = '/api/dramas';
+      params.page = 0;
     } else {
       path = '/api/foryou/1';
     }
@@ -100,6 +106,12 @@ export const useInfiniteDramas = () => {
       } else if (platform === 'dramapops') {
         path = '/api/dramas';
         params.limit = 30;
+      } else if (platform === 'dramabite') {
+        path = '/api/v1/dramas';
+        params.page = pageNum - 1;
+      } else if (platform === 'fundrama') {
+        path = '/api/dramas';
+        params.page = pageNum - 1;
       } else {
         path = `/api/new/${pageNum}`;
         params.pageSize = 50;
@@ -174,6 +186,12 @@ export const useRankDramas = () => {
     } else if (platform === 'dramapops') {
       path = '/api/dramas/trending';
       params.limit = 30;
+    } else if (platform === 'dramabite') {
+      path = '/api/v1/recommend';
+      params.page = 0;
+    } else if (platform === 'fundrama') {
+      path = '/api/dramas';
+      params.page = 0;
     } else {
       path = '/api/rank/1';
     }
@@ -190,6 +208,8 @@ export const useRankDramas = () => {
         } else if (platform === 'flextv') {
           list = extractList(data, platform);
         } else if (platform === 'dramapops') {
+          list = extractList(data, platform);
+        } else if (platform === 'dramabite') {
           list = extractList(data, platform);
         } else {
           list = data?.data?.list || [];
@@ -237,6 +257,16 @@ export const useSearchDramas = (query: string) => {
           path = '/api/search';
           params.q = query;
           params.limit = 30;
+        } else if (platform === 'dramabite') {
+          path = '/api/v1/search';
+          params.keyword = query;
+          params.page = 0; // DramaBite uses 0-indexed pages
+          params.limit = 50;
+        } else if (platform === 'fundrama') {
+          path = '/api/search';
+          params.q = query;
+          params.keyword = query;
+          params.page = 0;
         } else {
           path = `/api/search/${encodeURIComponent(query)}/1`;
           params.pageSize = 20;
@@ -469,6 +499,70 @@ export const useWatchData = (id: string | undefined, episode: number, platformOv
             qualities: playData?.data?.qualities,
           };
           setWatchData(normalizeWatchData(watchRaw, platform));
+        } else if (platform === 'dramabite') {
+          // DramaBite: /api/v1/drama/:id for details, /api/v1/drama/:id/episode/:ep for play
+          // Detail returns: { id, cover, episodes: [{id, number, title, free}] } (root-level, NO drama title)
+          // Episode returns: { id, number, title, video: 'm3u8_url', validFor: 1800 }
+          const cacheKey = `${platform}_${id}_${lang}`;
+
+          let drama;
+          if (detailCache[cacheKey]) {
+            drama = detailCache[cacheKey];
+          } else {
+            const detailRes = await fetch(apiUrl(`/api/v1/drama/${id}`, platform, { lang }));
+            const detailData = await detailRes.json();
+            drama = Array.isArray(detailData) ? detailData[0] : (detailData?.data || detailData);
+            detailCache[cacheKey] = drama;
+          }
+
+          const episodes = drama?.episodes || [];
+          setTotalEpisodes(episodes.length);
+          setChapters(normalizeChapters(drama, platform));
+
+          const playRes = await fetch(apiUrl(`/api/v1/drama/${id}/episode/${episode}`, platform, { lang }));
+          const playData = await playRes.json(); // { id, number, title, video: 'url', validFor: 1800 }
+
+          // Get the episode title and cover from the episodes list if available
+          let finalCover = drama?.cover || drama?.thumbnail || drama?.poster || '';
+          if (!finalCover && episodes.length > 0) {
+            const firstEp = episodes[0];
+            finalCover = firstEp.cover || firstEp.thumbnail || firstEp.poster || '';
+          }
+
+          const watchRaw = {
+            ...playData, // title, video, etc.
+            cover: finalCover,
+            episodes: drama?.episodes, // for smarter normalization if title is missing
+          };
+          setWatchData(normalizeWatchData(watchRaw, platform));
+        } else if (platform === 'fundrama') {
+          // FunDrama: /api/drama/:id for details and episodes
+          const cacheKey = `${platform}_${id}_${lang}`;
+
+          let drama;
+          if (detailCache[cacheKey]) {
+            drama = detailCache[cacheKey];
+          } else {
+            const detailRes = await fetch(apiUrl(`/api/drama/${id}`, platform, { lang }));
+            const detailData = await detailRes.json();
+            drama = detailData?.data?.ddriv || {};
+            detailCache[cacheKey] = drama; // Cache the whole ddriv object
+          }
+
+          const epCount = drama?.btra?.eshe || 0;
+          setTotalEpisodes(epCount);
+          setChapters(normalizeChapters(null, platform, epCount));
+
+          // Find the right episode from eclim
+          const epData = drama?.eclim?.find((e: any) => e.erev === episode) || drama?.eclim?.[episode - 1];
+
+          const watchRaw = {
+            nsin: drama?.btra?.nsin,
+            ptear: drama?.btra?.ptear,
+            dentra: drama?.btra?.dentra,
+            eclimEp: epData // Pass the current episode's object
+          };
+          setWatchData(normalizeWatchData(watchRaw, platform));
         } else {
           // DramaBox: fetch chapters list + watch data
           if (chapters.length === 0) {
@@ -505,4 +599,29 @@ export const useWatchData = (id: string | undefined, episode: number, platformOv
   }, [id, episode, lang, platform]);
 
   return { watchData, chapters, totalEpisodes, loading };
+};
+
+/* ===== Drama Likes ===== */
+export const useDramaLikes = (id: string | undefined) => {
+  const [likes, setLikes] = useState<number>(0);
+  const { platform } = usePlatform();
+
+  useEffect(() => {
+    if (!id || platform !== 'dramabite') return;
+
+    const fetchLikes = async () => {
+      try {
+        const response = await fetch(apiUrl(`/api/v1/drama/${id}/likes`, 'dramabite'));
+        const data = await response.json();
+        // DramaBite likes response: { id, likes } or similar
+        setLikes(data?.likes || 0);
+      } catch (err) {
+        console.error('Failed to fetch likes:', err);
+      }
+    };
+
+    fetchLikes();
+  }, [id, platform]);
+
+  return { likes };
 };
