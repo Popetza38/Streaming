@@ -137,10 +137,14 @@ const DramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: stri
           {drama.episodes} EP
         </div>
       )}
-      {/* Thai dubbed badge */}
-      {drama.language === 'th' && (
+      {/* Language badges */}
+      {drama.hasThaiDub ? (
         <div className="absolute bottom-2 right-2 bg-gradient-to-r from-blue-600 to-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
           🇹🇭 พากย์ไทย
+        </div>
+      ) : drama.hasThaiSub && (
+        <div className="absolute bottom-2 right-2 bg-black/70 text-zinc-200 text-[9px] font-medium px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm border border-zinc-600/50">
+          📝 ซับไทย
         </div>
       )}
       <div className="drama-overlay">
@@ -213,10 +217,14 @@ const RankedDramaItem = ({ drama, platform, rank }: { drama: NormalizedDrama; pl
           {drama.episodes} EP
         </div>
       )}
-      {/* Thai dubbed badge */}
-      {drama.language === 'th' && (
+      {/* Language badges */}
+      {drama.hasThaiDub ? (
         <div className="absolute bottom-2 right-2 bg-gradient-to-r from-blue-600 to-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
           🇹🇭 พากย์ไทย
+        </div>
+      ) : drama.hasThaiSub && (
+        <div className="absolute bottom-2 right-2 bg-black/70 text-zinc-200 text-[9px] font-medium px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm border border-zinc-600/50">
+          📝 ซับไทย
         </div>
       )}
       <div className="drama-overlay">
@@ -263,10 +271,14 @@ const GridDramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: 
           {drama.episodes} EP
         </div>
       )}
-      {/* Thai dubbed badge */}
-      {drama.language === 'th' && (
+      {/* Language badges */}
+      {drama.hasThaiDub ? (
         <div className="absolute bottom-2 right-2 bg-gradient-to-r from-blue-600 to-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
           🇹🇭 พากย์ไทย
+        </div>
+      ) : drama.hasThaiSub && (
+        <div className="absolute bottom-2 right-2 bg-black/70 text-zinc-200 text-[9px] font-medium px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm border border-zinc-600/50">
+          📝 ซับไทย
         </div>
       )}
       <div className="drama-overlay">

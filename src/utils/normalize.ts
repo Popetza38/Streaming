@@ -12,27 +12,41 @@ export interface NormalizedDrama {
     tags?: string[];
     corner?: { name: string; color: string };
     rank?: { hotCode: string };
-    language?: string;
+    language?: string; // Kept for API queries
+    hasThaiDub?: boolean;
+    hasThaiSub?: boolean;
 }
 
 /* ===== Detect Thai language from tags or name ===== */
-function detectLangFromTags(tags: any[], name?: string, platform?: string, rawLang?: string): string | undefined {
-    // 1. If platform is DramaBox and lang is 'th', we trust it.
-    if (platform === 'dramabox' && rawLang === 'th') return 'th';
-    if (platform === 'fundrama' && rawLang === 'th') return 'th';
+export function detectThaiLanguage(tags: any[], name?: string, platform?: string, rawLang?: string): { dub: boolean, sub: boolean } {
+    let dub = false;
+    let sub = false;
+
+    // 1. If platform is DramaBox and lang is 'th', we trust it's dubbed.
+    if (platform === 'dramabox' && rawLang === 'th') dub = true;
+    if (platform === 'fundrama' && rawLang === 'th') dub = true;
 
     const thaiDubRegex = /(พากย์ไทย|พากย์|Thai Dub)/i;
+    const thaiSubRegex = /[\u0E00-\u0E7F]/; // Any Thai character implies Thai sub or title
 
     // Check tags
     if (Array.isArray(tags)) {
         for (const tag of tags) {
             const label = typeof tag === 'string' ? tag : tag?.tagName ?? tag?.tag_name ?? '';
-            if (thaiDubRegex.test(label)) return 'th';
+            if (thaiDubRegex.test(label)) dub = true;
+            if (thaiSubRegex.test(label)) sub = true;
         }
     }
     // Check name
-    if (name && thaiDubRegex.test(name)) return 'th';
-    return undefined;
+    if (name) {
+        if (thaiDubRegex.test(name)) dub = true;
+        if (thaiSubRegex.test(name)) sub = true;
+    }
+    
+    // If it's explicitly dubbed, we can assume it's also subbed (or at least localized)
+    if (dub) sub = true;
+
+    return { dub, sub };
 }
 
 export interface NormalizedWatchData {
@@ -74,7 +88,9 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
             tags,
             corner: undefined,
             rank: undefined,
-            language: detectLangFromTags(raw.tag_list ?? [], raw.title, platform, raw.languages ?? raw.lang),
+            language: raw.lang || raw.languages || 'th',
+            hasThaiDub: detectThaiLanguage(raw.tag_list ?? [], raw.title, platform, raw.languages ?? raw.lang).dub,
+            hasThaiSub: detectThaiLanguage(raw.tag_list ?? [], raw.title, platform, raw.languages ?? raw.lang).sub,
         };
     }
 
@@ -90,7 +106,9 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
             tags: raw.tags ?? [],
             corner: raw.corner ?? undefined,
             rank: raw.rank ?? undefined,
-            language: detectLangFromTags(raw.tags ?? [], raw.name, platform, raw.lang),
+            language: raw.lang || 'th',
+            hasThaiDub: detectThaiLanguage(raw.tags ?? [], raw.name, platform, raw.lang).dub,
+            hasThaiSub: detectThaiLanguage(raw.tags ?? [], raw.name, platform, raw.lang).sub,
         };
     }
 
@@ -108,7 +126,9 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
             tags,
             corner: undefined,
             rank: undefined,
-            language: detectLangFromTags(raw.tag_list ?? [], raw.series_name, platform, raw.lang),
+            language: raw.lang || 'th',
+            hasThaiDub: detectThaiLanguage(raw.tag_list ?? [], raw.series_name, platform, raw.lang).dub,
+            hasThaiSub: detectThaiLanguage(raw.tag_list ?? [], raw.series_name, platform, raw.lang).sub,
         };
     }
 
@@ -139,7 +159,9 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
             tags: raw.tags ?? [],
             corner: undefined,
             rank: undefined,
-            language: detectLangFromTags(raw.tags ?? [], raw.title ?? raw.name, platform, raw.lang),
+            language: raw.lang || 'th',
+            hasThaiDub: detectThaiLanguage(raw.tags ?? [], raw.title ?? raw.name, platform, raw.lang).dub,
+            hasThaiSub: detectThaiLanguage(raw.tags ?? [], raw.title ?? raw.name, platform, raw.lang).sub,
         };
     }
 
@@ -186,7 +208,9 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
             tags: raw.genres ?? raw.tags ?? [],
             corner: undefined,
             rank: undefined,
-            language: detectLangFromTags(raw.genres ?? raw.tags ?? [], name, platform, raw.lang),
+            language: raw.lang || 'th',
+            hasThaiDub: detectThaiLanguage(raw.genres ?? raw.tags ?? [], name, platform, raw.lang).dub,
+            hasThaiSub: detectThaiLanguage(raw.genres ?? raw.tags ?? [], name, platform, raw.lang).sub,
         };
     }
 
@@ -204,7 +228,9 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
             tags: [],
             corner: undefined,
             rank: undefined,
-            language: detectLangFromTags([], name, platform, raw.lhomew ?? raw.lang),
+            language: raw.lhomew || raw.lang || 'th',
+            hasThaiDub: detectThaiLanguage([], name, platform, raw.lhomew ?? raw.lang).dub,
+            hasThaiSub: detectThaiLanguage([], name, platform, raw.lhomew ?? raw.lang).sub,
         };
     }
 
@@ -220,7 +246,9 @@ export function normalizeDrama(raw: any, platform: Platform): NormalizedDrama {
         tags: raw.tags ?? [],
         corner: raw.corner ?? undefined,
         rank: raw.rank ?? undefined,
-        language: detectLangFromTags(raw.tagDetails ?? raw.tags ?? [], raw.bookName, 'dramabox', raw.lang),
+        language: raw.lang || 'th',
+        hasThaiDub: detectThaiLanguage(raw.tagDetails ?? raw.tags ?? [], raw.bookName, 'dramabox', raw.lang).dub,
+        hasThaiSub: detectThaiLanguage(raw.tagDetails ?? raw.tags ?? [], raw.bookName, 'dramabox', raw.lang).sub,
     };
 }
 

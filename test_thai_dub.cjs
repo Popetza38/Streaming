@@ -1,64 +1,83 @@
-// Test script to verify the stricter Thai dub detection logic.
-
-// Mock platform type
-const platform = 'shortmax';
+// Test script to verify the Sub and Dub detection logic.
 
 const cases = [
     {
-        name: 'Should show th for DramaBox with lang=th',
+        name: 'DramaBox explicit "lang: th"',
         raw: { bookName: 'Test', lang: 'th' },
         platform: 'dramabox',
-        expected: 'th'
+        expectedDub: true,
+        expectedSub: true
     },
     {
-        name: 'Should NOT show th for DramaBox with lang=en',
+        name: 'DramaBox explicit "lang: en"',
         raw: { bookName: 'Test', lang: 'en' },
         platform: 'dramabox',
-        expected: undefined
+        expectedDub: false,
+        expectedSub: false
     },
     {
-        name: 'Should show th if "พากย์ไทย" in title',
+        name: 'Has "พากย์ไทย" in title',
         raw: { title: 'Drama Name (พากย์ไทย)', lang: 'en' },
         platform: 'shortbox',
-        expected: 'th'
+        expectedDub: true,
+        expectedSub: true
     },
     {
-        name: 'Should NOT show th if only Thai characters in title',
+        name: 'Has only Thai characters in title (Sub only)',
         raw: { title: 'ละครไทย', lang: 'en' },
         platform: 'shortmax',
-        expected: undefined
+        expectedDub: false,
+        expectedSub: true
     },
     {
-        name: 'Should show th if "พากย์" in tags',
+        name: 'Has "พากย์" in tags',
         raw: { name: 'Drama', tags: ['พากย์', 'Action'], lang: 'vi' },
         platform: 'shortmax',
-        expected: 'th'
+        expectedDub: true,
+        expectedSub: true
+    },
+    {
+        name: 'Has general Thai in tags (Sub only)',
+        raw: { name: 'Drama', tags: ['ดราม่า', 'Action'], lang: 'en' },
+        platform: 'flextv',
+        expectedDub: false,
+        expectedSub: true
     }
 ];
 
-cases.forEach(c => {
-    // We need to bypass the TypeScript export and use the file contents or just test the logic directly
-    // Since I can't easily import TS in node without setup, I'll just test the logic extracted
-});
+function detectThaiLanguage(tags, name, platform, rawLang) {
+    let dub = false;
+    let sub = false;
 
-// Extracted logic for testing in node
-function detectLangFromTags(tags, name, platform, rawLang) {
-    if (platform === 'dramabox' && rawLang === 'th') return 'th';
-    if (platform === 'fundrama' && rawLang === 'th') return 'th';
+    if (platform === 'dramabox' && rawLang === 'th') dub = true;
+    if (platform === 'fundrama' && rawLang === 'th') dub = true;
+
     const thaiDubRegex = /(พากย์ไทย|พากย์|Thai Dub)/i;
+    const thaiSubRegex = /[\u0E00-\u0E7F]/;
+
     if (Array.isArray(tags)) {
         for (const tag of tags) {
             const label = typeof tag === 'string' ? tag : tag?.tagName ?? tag?.tag_name ?? '';
-            if (thaiDubRegex.test(label)) return 'th';
+            if (thaiDubRegex.test(label)) dub = true;
+            if (thaiSubRegex.test(label)) sub = true;
         }
     }
-    if (name && thaiDubRegex.test(name)) return 'th';
-    return undefined;
+    if (name) {
+        if (thaiDubRegex.test(name)) dub = true;
+        if (thaiSubRegex.test(name)) sub = true;
+    }
+    
+    if (dub) sub = true;
+
+    return { dub, sub };
 }
 
-console.log('--- Testing detectLangFromTags logic ---');
+console.log('--- Testing detectThaiLanguage logic ---');
 cases.forEach(c => {
-    const result = detectLangFromTags(c.raw.tags || c.raw.tag_list || [], c.raw.title || c.raw.name || c.raw.bookName, c.platform, c.raw.lang);
-    const pass = result === c.expected;
-    console.log(`${pass ? '✅' : '❌'} ${c.name} | Got: ${result}, Expected: ${c.expected}`);
+    const result = detectThaiLanguage(c.raw.tags || c.raw.tag_list || [], c.raw.title || c.raw.name || c.raw.bookName, c.platform, c.raw.lang);
+    const passDub = result.dub === c.expectedDub;
+    const passSub = result.sub === c.expectedSub;
+    console.log(`${passDub && passSub ? '✅' : '❌'} ${c.name}`);
+    console.log(`   Dub: Got ${result.dub}, Expected ${c.expectedDub}`);
+    console.log(`   Sub: Got ${result.sub}, Expected ${c.expectedSub}`);
 });
