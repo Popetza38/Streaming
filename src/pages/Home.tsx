@@ -140,7 +140,7 @@ const DramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: stri
       {/* Thai dubbed badge */}
       {drama.language === 'th' && (
         <div className="absolute bottom-2 right-2 bg-gradient-to-r from-blue-600 to-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
-          🇹🇭 พากไทย
+          🇹🇭 พากย์ไทย
         </div>
       )}
       <div className="drama-overlay">
@@ -216,7 +216,7 @@ const RankedDramaItem = ({ drama, platform, rank }: { drama: NormalizedDrama; pl
       {/* Thai dubbed badge */}
       {drama.language === 'th' && (
         <div className="absolute bottom-2 right-2 bg-gradient-to-r from-blue-600 to-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
-          🇹🇭 พากไทย
+          🇹🇭 พากย์ไทย
         </div>
       )}
       <div className="drama-overlay">
@@ -266,7 +266,7 @@ const GridDramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: 
       {/* Thai dubbed badge */}
       {drama.language === 'th' && (
         <div className="absolute bottom-2 right-2 bg-gradient-to-r from-blue-600 to-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
-          🇹🇭 พากไทย
+          🇹🇭 พากย์ไทย
         </div>
       )}
       <div className="drama-overlay">

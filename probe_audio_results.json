@@ -1,0 +1,136 @@
+{
+  "shortbox_detail": "Request failed with status code 404",
+  "flextv_detail": {
+    "title": "Nova Vida nos Anos 80",
+    "langFields": {
+      "lang": "โปรตุเกส"
+    },
+    "allKeys": [
+      "series_id",
+      "series_name",
+      "lang",
+      "cover",
+      "video_type",
+      "serial_status",
+      "description",
+      "watch_num",
+      "release_date",
+      "series_level",
+      "series_library_id",
+      "video_duration",
+      "max_series_no",
+      "director",
+      "writer",
+      "starring",
+      "tag"
+    ]
+  },
+  "dramapops_detail": "Request failed with status code 500",
+  "dramabite_detail": {
+    "langFields": {},
+    "allKeys": [
+      "id",
+      "cover",
+      "episodes"
+    ]
+  },
+  "dramabox": {
+    "title": "พยัคฆ์สาวคืนรัง(พากย์ไทย)",
+    "tags": [
+      "หักมุม",
+      "ครอบครัว",
+      "โมเดิร์น",
+      "หญิงแกร่ง",
+      "ตบหน้าเอาคืน",
+      "มาเฟีย"
+    ],
+    "langFields": {
+      "lang": "th"
+    },
+    "allKeys": [
+      "bookId",
+      "bookName",
+      "introduction",
+      "cover",
+      "chapterCount",
+      "playCount",
+      "tags",
+      "tagDetails",
+      "corner",
+      "source",
+      "lang",
+      "timestamp"
+    ]
+  },
+  "shortmax": "Request failed with status code 401",
+  "dramapops": {
+    "title": "ความสัมพันธ์ไม่ชัดเจนกับเพื่อนมหาเศรษฐีของฉัน",
+    "tags": [
+      "จากเพื่อนสู่คนรัก"
+    ],
+    "langFields": {},
+    "allKeys": [
+      "id",
+      "slug",
+      "title",
+      "poster",
+      "posterSmall",
+      "totalEpisodes",
+      "freeEpisodes",
+      "watchCount",
+      "shareCount",
+      "addedToListCount",
+      "description",
+      "tags"
+    ]
+  },
+  "dramabite": {
+    "title": "น้ำค้างแข็งร่วงหล่น หัวใจที่แตกสลาย",
+    "langFields": {},
+    "allKeys": [
+      "id",
+      "title",
+      "cover",
+      "episodes"
+    ]
+  },
+  "fundrama": "Request failed with status code 401",
+  "flextv": {
+    "title": "ตัวกาลกิณีหรือดาวนำโชค?",
+    "tags": [
+      "ตอบโต้",
+      "สมัยโบราณ",
+      "จอมยุทธแฟนตาซี",
+      "ตบหน้าคนชั่ว",
+      "ซ่อนตัวตน",
+      "น่ารัก Babies",
+      "นางเอกสายแกร่ง",
+      "คุณหนู",
+      "เทพเซียน",
+      "โลกสมมติ"
+    ],
+    "langFields": {},
+    "allKeys": [
+      "series_id",
+      "video_type",
+      "series_name",
+      "description",
+      "cover",
+      "serial_status",
+      "watch_num",
+      "series_topic",
+      "show_video_type",
+      "icon_type",
+      "icon_text",
+      "last_series_no",
+      "id",
+      "icon",
+      "sort",
+      "icon_color",
+      "tag",
+      "tag_list",
+      "content_type",
+      "ext"
+    ]
+  }
+}
