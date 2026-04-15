@@ -19,7 +19,7 @@ const BASE_API_URL = process.env.BASE_API_URL || 'https://captain.sapimu.au';
 const API_TOKEN = process.env.API_TOKEN || '';
 
 // Platform API URLs derived from BASE_API_URL
-const DB_API_URL = `${BASE_API_URL}/dramabox/api/v1`;
+const DB_API_URL = `${BASE_API_URL}/dramaboxv2/api/v1`;
 const SM_API_URL = `${BASE_API_URL}/shortmax/api/v1`;
 const SB_API_URL = `${BASE_API_URL}/shortbox/api`;
 const FLEX_API_URL = `${BASE_API_URL}/flextv/api/v1`;
