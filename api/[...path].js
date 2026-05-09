@@ -3,7 +3,7 @@ import axios from 'axios';
 const API_URL = process.env.API_URL || 'https://captain.sapimu.au/dramaboxv4';
 const TOKEN = process.env.AUTH_TOKEN || '05fdfb98a531276ac6a449f9fd680123eb0ad40993ee76079d8a5e485bf7892d';
 
-const ALLOWED_PATHS = ['/languages', '/home', '/rank', '/search', '/drama/'];
+const ALLOWED_PATHS = ['/home', '/rank', '/search', '/drama', '/languages', '/classify', '/suggest', '/foryou', '/new'];
 
 export default async function handler(req, res) {
   // Enable CORS
