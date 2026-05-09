@@ -1,85 +1,74 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../store/language';
-import { usePlatform } from '../store/platform';
-import type { Platform } from '../store/platform';
-import {
-  normalizeDramaList,
-  normalizeWatchData,
-  normalizeChapters,
-  extractList,
-  type NormalizedDrama,
-  type NormalizedWatchData,
-  type NormalizedChapter,
-} from '../utils/normalize';
 
-// In-memory cache for details and chapters to speed up episode transitions
-const detailCache: Record<string, any> = {};
-const chaptersCache: Record<string, any> = {};
-
-/* ===== Helper: build API url with platform query param ===== */
-function apiUrl(path: string, platform: string, extra: Record<string, string | number> = {}) {
-  const params = new URLSearchParams({ platform, ...Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, String(v)])) });
-  return `${path}?${params}`;
+interface TagDetail {
+  tagId: number;
+  tagName: string;
 }
 
-/* ===== For You (featured dramas) ===== */
+interface Drama {
+  bookId: string;
+  bookName: string;
+  introduction: string;
+  cover: string;
+  coverWap?: string;
+  bannerUrl?: string;
+  chapterCount: number;
+  playCount: string;
+  tags: string[];
+  tagV3s?: TagDetail[];
+  tagDetails?: TagDetail[];
+  corner?: {
+    cornerType: number;
+    name: string;
+    color: string;
+  };
+  rank?: {
+    rankType: number;
+    hotCode: string;
+    recCopy: string;
+    sort: number;
+  };
+}
+
 export const useDramas = () => {
-  const [dramas, setDramas] = useState<NormalizedDrama[]>([]);
+  const [dramas, setDramas] = useState<Drama[]>([]);
   const [loading, setLoading] = useState(true);
   const { lang } = useLanguage();
-  const { platform } = usePlatform();
 
   useEffect(() => {
-    setLoading(true);
-    setDramas([]);
+    const fetchDramas = async () => {
+      try {
+        const response = await fetch(`/api/home?page=1&size=10&lang=${lang}`);
+        const data = await response.json();
+        const isSuccess = data.success || data.data?.success || data.code === 0;
+        if (isSuccess) {
+          const list = data.data?.data?.classifyBookList?.records || 
+                       data.data?.classifyBookList?.records || 
+                       data.data?.list || 
+                       data.list || [];
+          setDramas(list);
+        }
+      } catch (error) {
+        console.error('Failed to fetch dramas:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    let path: string;
-    const params: Record<string, string | number> = { lang };
-
-    if (platform === 'shortbox') {
-      path = '/api/list';
-      params.page = 1;
-      params.page_size = 30;
-      params.languages = lang;
-    } else if (platform === 'shortmax') {
-      path = '/api/foryou';
-      params.page = 1;
-    } else if (platform === 'flextv') {
-      path = '/api/tabs/popular';
-    } else if (platform === 'dramapops') {
-      path = '/api/homepage';
-    } else if (platform === 'dramabite') {
-      path = '/api/v1/foryou';
-      params.page = 0;
-    } else if (platform === 'fundrama') {
-      path = '/api/dramas';
-      params.page = 0;
-    } else {
-      path = '/api/foryou/1';
-    }
-
-    fetch(apiUrl(path, platform, params))
-      .then(res => res.json())
-      .then(data => {
-        const list = extractList(data, platform);
-        setDramas(normalizeDramaList(list, platform));
-      })
-      .catch(err => console.error('Failed to fetch dramas:', err))
-      .finally(() => setLoading(false));
-  }, [lang, platform]);
+    fetchDramas();
+  }, [lang]);
 
   return { dramas, loading };
 };
 
-/* ===== Infinite scroll (new dramas) ===== */
 export const useInfiniteDramas = () => {
-  const [dramas, setDramas] = useState<NormalizedDrama[]>([]);
+  const [dramas, setDramas] = useState<Drama[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const { lang } = useLanguage();
-  const { platform } = usePlatform();
 
   const fetchDramas = useCallback(async (pageNum: number, isLoadMore = false) => {
     if (isLoadMore) {
@@ -89,63 +78,38 @@ export const useInfiniteDramas = () => {
     }
 
     try {
-      let path: string;
-      const params: Record<string, string | number> = { lang };
-
-      if (platform === 'shortbox') {
-        path = '/api/list';
-        params.page = pageNum;
-        params.page_size = 30;
-        params.languages = lang;
-      } else if (platform === 'shortmax') {
-        path = '/api/foryou';
-        params.page = pageNum;
-      } else if (platform === 'flextv') {
-        path = '/api/tabs/new';
-        params.page_no = pageNum;
-      } else if (platform === 'dramapops') {
-        path = '/api/dramas';
-        params.limit = 30;
-      } else if (platform === 'dramabite') {
-        path = '/api/v1/dramas';
-        params.page = pageNum - 1;
-      } else if (platform === 'fundrama') {
-        path = '/api/dramas';
-        params.page = pageNum - 1;
-      } else {
-        path = `/api/new/${pageNum}`;
-        params.pageSize = 50;
-      }
-
-      const response = await fetch(apiUrl(path, platform, params));
+      const response = await fetch(`/api/home?page=${pageNum}&size=100&lang=${lang}`);
       const data = await response.json();
-      const list = extractList(data, platform);
-      const normalized = normalizeDramaList(list, platform);
 
-      if (isLoadMore) {
-        setDramas(prev => [...prev, ...normalized]);
-      } else {
-        setDramas(normalized);
+      const isSuccess = data.success || data.data?.success || data.code === 0;
+      if (isSuccess) {
+        const newDramas = data.data?.data?.classifyBookList?.records ||
+                          data.data?.classifyBookList?.records ||
+                          data.data?.list ||
+                          data.list || [];
+
+        if (isLoadMore) {
+          setDramas((prev: Drama[]) => [...prev, ...newDramas]);
+        } else {
+          setDramas(newDramas);
+        }
+
+        // Check if we got a full page of results
+        const totalRecords = data.data?.data?.classifyBookList?.total ||
+                            data.data?.classifyBookList?.total ||
+                            data.data?.total || 0;
+        const currentTotal = isLoadMore ? dramas.length + newDramas.length : newDramas.length;
+        setHasMore(currentTotal < totalRecords && newDramas.length === 100);
       }
-
-      setHasMore(
-        platform === 'shortbox' ? list.length >= 20 :
-          platform === 'shortmax' ? list.length >= 20 :
-            platform === 'flextv' ? list.length >= 20 :
-              list.length >= 50
-      );
     } catch (error) {
       console.error('Failed to fetch dramas:', error);
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [lang, platform]);
+  }, [lang]);
 
   useEffect(() => {
-    setDramas([]);
-    setPage(1);
-    setHasMore(true);
     fetchDramas(1);
   }, [fetchDramas]);
 
@@ -160,74 +124,39 @@ export const useInfiniteDramas = () => {
   return { dramas, loading, loadingMore, hasMore, loadMore };
 };
 
-/* ===== Rank dramas ===== */
 export const useRankDramas = () => {
-  const [dramas, setDramas] = useState<NormalizedDrama[]>([]);
+  const [dramas, setDramas] = useState<Drama[]>([]);
   const [loading, setLoading] = useState(true);
-  const { platform } = usePlatform();
 
   useEffect(() => {
-    setLoading(true);
-    setDramas([]);
-
-    let path: string;
-    const params: Record<string, string | number> = { lang: 'in' };
-
-    if (platform === 'shortbox') {
-      path = '/api/new-list';
-      params.page = 1;
-      params.page_size = 30;
-      params.languages = 'en';
-    } else if (platform === 'shortmax') {
-      path = '/api/foryou';
-      params.page = 2;
-    } else if (platform === 'flextv') {
-      path = '/api/tabs/popular';
-    } else if (platform === 'dramapops') {
-      path = '/api/dramas/trending';
-      params.limit = 30;
-    } else if (platform === 'dramabite') {
-      path = '/api/v1/recommend';
-      params.page = 0;
-    } else if (platform === 'fundrama') {
-      path = '/api/dramas';
-      params.page = 0;
-    } else {
-      path = '/api/rank/1';
-    }
-
-    fetch(apiUrl(path, platform, params))
-      .then(res => res.json())
-      .then(data => {
-        let list: any[];
-        if (platform === 'shortbox') {
-          list = extractList(data, platform);
-        } else if (platform === 'shortmax') {
-          const items = data?.data || [];
-          list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
-        } else if (platform === 'flextv') {
-          list = extractList(data, platform);
-        } else if (platform === 'dramapops') {
-          list = extractList(data, platform);
-        } else if (platform === 'dramabite') {
-          list = extractList(data, platform);
-        } else {
-          list = data?.data?.list || [];
+    const fetchDramas = async () => {
+      try {
+        const response = await fetch('/api/rank?lang=th');
+        const data = await response.json();
+        const isSuccess = data.success || data.data?.success || data.code === 0;
+        if (isSuccess) {
+          const list = data.data?.data?.rankList || 
+                       data.data?.rankList || 
+                       data.data?.list || 
+                       data.list || [];
+          setDramas(list);
         }
-        setDramas(normalizeDramaList(list, platform));
-      })
-      .catch(err => console.error('Failed to fetch rank dramas:', err))
-      .finally(() => setLoading(false));
-  }, [platform]);
+      } catch (error) {
+        console.error('Failed to fetch rank dramas:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDramas();
+  }, []);
 
   return { dramas, loading };
 };
 
-/* ===== Search dramas ===== */
 export const useSearchDramas = (query: string) => {
-  const [dramas, setDramas] = useState<NormalizedDrama[]>([]);
+  const [dramas, setDramas] = useState<Drama[]>([]);
   const [loading, setLoading] = useState(false);
-  const { platform } = usePlatform();
 
   useEffect(() => {
     if (!query.trim()) {
@@ -238,44 +167,16 @@ export const useSearchDramas = (query: string) => {
     const fetchDramas = async () => {
       setLoading(true);
       try {
-        let path: string;
-        const params: Record<string, string | number> = { lang: 'in' };
-
-        if (platform === 'shortbox') {
-          path = '/api/search';
-          params.q = query;
-          params.page = 1;
-          params.page_size = 30;
-          params.languages = 'en';
-        } else if (platform === 'shortmax') {
-          path = '/api/search';
-          params.q = query;
-        } else if (platform === 'flextv') {
-          path = '/api/search';
-          params.q = query;
-        } else if (platform === 'dramapops') {
-          path = '/api/search';
-          params.q = query;
-          params.limit = 30;
-        } else if (platform === 'dramabite') {
-          path = '/api/v1/search';
-          params.keyword = query;
-          params.page = 0; // DramaBite uses 0-indexed pages
-          params.limit = 50;
-        } else if (platform === 'fundrama') {
-          path = '/api/search';
-          params.q = query;
-          params.keyword = query;
-          params.page = 0;
-        } else {
-          path = `/api/search/${encodeURIComponent(query)}/1`;
-          params.pageSize = 20;
-        }
-
-        const response = await fetch(apiUrl(path, platform, params));
+        const response = await fetch(`/api/search?keyword=${encodeURIComponent(query)}&page=1&lang=th&pageSize=20`);
         const data = await response.json();
-        const list = extractList(data, platform);
-        setDramas(normalizeDramaList(list, platform));
+        const isSuccess = data.success || data.data?.success || data.code === 0;
+        if (isSuccess) {
+          const list = data.data?.data?.searchList ||
+                       data.data?.searchList ||
+                       data.data?.list ||
+                       data.list || [];
+          setDramas(list);
+        }
       } catch (error) {
         console.error('Failed to search dramas:', error);
       } finally {
@@ -285,343 +186,84 @@ export const useSearchDramas = (query: string) => {
 
     const debounce = setTimeout(fetchDramas, 300);
     return () => clearTimeout(debounce);
-  }, [query, platform]);
+  }, [query]);
 
   return { dramas, loading };
 };
 
-/* ===== Watch data (video playback) ===== */
-export const useWatchData = (id: string | undefined, episode: number, platformOverride?: string) => {
-  const [watchData, setWatchData] = useState<NormalizedWatchData | null>(null);
-  const [chapters, setChapters] = useState<NormalizedChapter[]>([]);
-  const [totalEpisodes, setTotalEpisodes] = useState(0);
+interface CategorySection {
+  tagId: number;
+  tagName: string;
+  dramas: Drama[];
+}
+
+export const useCategories = () => {
+  const [categories, setCategories] = useState<CategorySection[]>([]);
   const [loading, setLoading] = useState(true);
   const { lang } = useLanguage();
-  const { platform: storePlatform } = usePlatform();
-  const platform = (platformOverride || storePlatform) as Platform;
 
   useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-
-    const fetchData = async () => {
+    const fetchCategories = async () => {
+      setLoading(true);
       try {
-        if (platform === 'shortbox') {
-          const cacheKey = `${platform}_${id}_${lang}`;
-          let detailInner, epsInner;
+        // First fetch to get available tags
+        const homeResponse = await fetch(`/api/home?page=1&size=20&lang=${lang}`);
+        const homeData = await homeResponse.json();
 
-          if (detailCache[cacheKey] && chaptersCache[cacheKey]) {
-            detailInner = detailCache[cacheKey];
-            epsInner = chaptersCache[cacheKey];
-          } else {
-            // ShortBox: /detail/{id} + /episodes/{id}
-            const [detailRes, epsRes] = await Promise.all([
-              fetch(apiUrl(`/api/detail/${id}`, platform, { languages: lang })),
-              fetch(apiUrl(`/api/episodes/${id}`, platform, { index: 1, count: 200, languages: lang })),
-            ]);
-
-            const detailData = await detailRes.json();
-            const epsData = await epsRes.json();
-
-            // ShortBox API responses may be double-nested: { data: { code, data: { ... } } }
-            detailInner = detailData?.data?.data ?? detailData?.data ?? detailData;
-            epsInner = epsData?.data?.data ?? epsData?.data ?? epsData;
-
-            detailCache[cacheKey] = detailInner;
-            chaptersCache[cacheKey] = epsInner;
-          }
-
-          const drama = detailInner;
-          const episodes = epsInner?.episodes || [];
-          const epCount = episodes.length || drama?.total || 0;
-          setTotalEpisodes(epCount);
-          setChapters(normalizeChapters({ data: epsInner }, platform, epCount));
-
-          // Find the episode to play
-          const ep = episodes[episode - 1];
-          if (ep) {
-            const pil = ep.play_info_list || [];
-            let playUrl = '', playAuth = '', kid = '';
-            let qualities: any[] = [];
-
-            if (pil.length > 0) {
-              const sorted = [...pil].sort((a: any, b: any) => (b.Height || 0) - (a.Height || 0));
-              const best = sorted[0];
-              playUrl = best.MainPlayUrl || best.BackupPlayUrl || '';
-              playAuth = best.PlayAuth || '';
-              kid = best.PlayAuthId || '';
-              qualities = sorted.map((q: any) => ({
-                url: q.MainPlayUrl || q.BackupPlayUrl || '',
-                playAuth: q.PlayAuth || '',
-                kid: q.PlayAuthId || '',
-                height: q.Height || 0,
-                label: q.Height ? `${q.Height}p` : 'Default',
-              }));
-            }
-
-            // If no play_info_list, try play_auth_token
-            if (!playUrl && ep.play_auth_token) {
-              try {
-                const token = JSON.parse(atob(ep.play_auth_token));
-                const vodUrl = 'https://vod.byteplusapi.com?' + token.GetPlayInfoToken;
-                const r = await fetch(`/sb-proxy?url=${encodeURIComponent(vodUrl)}`);
-                const vod = await r.json();
-                const playInfoList = vod?.Result?.PlayInfoList || [];
-                if (playInfoList.length > 0) {
-                  const sorted = [...playInfoList].sort((a: any, b: any) => (b.Height || 0) - (a.Height || 0));
-                  const best = sorted[0];
-                  playUrl = best.MainPlayUrl || best.BackupPlayUrl || '';
-                  playAuth = best.PlayAuth || '';
-                  kid = best.PlayAuthId || '';
-                  qualities = sorted.map((q: any) => ({
-                    url: q.MainPlayUrl || q.BackupPlayUrl || '',
-                    playAuth: q.PlayAuth || '',
-                    kid: q.PlayAuthId || '',
-                    height: q.Height || 0,
-                    label: q.Height ? `${q.Height}p` : 'Default',
-                  }));
-                }
-              } catch (e) {
-                console.error('VOD fetch error:', e);
-              }
-            }
-
-            // Derive key and build proxy URL
-            let finalUrl = playUrl;
-            if (playAuth && kid) {
-              try {
-                await fetch(`/derive-key?playAuth=${encodeURIComponent(playAuth)}&kid=${encodeURIComponent(kid)}`);
-                finalUrl = `/sb-proxy?url=${encodeURIComponent(playUrl)}&kid=${encodeURIComponent(kid)}`;
-              } catch (e) {
-                console.error('Key derivation failed:', e);
-              }
-            } else if (playUrl) {
-              finalUrl = `/sb-proxy?url=${encodeURIComponent(playUrl)}`;
-            }
-
-            const imgUrl = drama?.cover_image || drama?.cover_image_thumb?.thumb || '';
-
-            setWatchData(normalizeWatchData({
-              name: drama?.title ?? '',
-              cover: imgUrl ? `/img?url=${encodeURIComponent(imgUrl)}` : '',
-              videoUrl: finalUrl,
-              summary: drama?.desc ?? '',
-              playAuth,
-              kid,
-              qualities,
-            }, platform));
-          }
-        } else if (platform === 'shortmax') {
-          const cacheKey = `${platform}_${id}_${lang}`;
-
-          let drama;
-          if (detailCache[cacheKey]) {
-            drama = detailCache[cacheKey];
-          } else {
-            const detailRes = await fetch(apiUrl(`/api/detail/${id}`, platform, { lang }));
-            const detailData = await detailRes.json();
-            drama = detailData?.data;
-            detailCache[cacheKey] = drama;
-          }
-
-          // ShortMax: path-based endpoints: /play/{code}?ep=X
-          const playRes = await fetch(apiUrl(`/api/play/${id}`, platform, { ep: episode, lang }));
-          const playData = await playRes.json();
-
-          const epCount = drama?.episodes || 0;
-          setTotalEpisodes(epCount);
-          setChapters(normalizeChapters(null, platform, epCount));
-
-          // Build watch data from play + detail
-          const watchRaw = {
-            name: drama?.name,
-            cover: drama?.cover,
-            summary: drama?.summary,
-            video: playData?.data?.video,
-          };
-          setWatchData(normalizeWatchData(watchRaw, platform));
-        } else if (platform === 'flextv') {
-          const cacheKey = `${platform}_${id}_${lang}`;
-          let detailInner, epsInner;
-
-          if (detailCache[cacheKey] && chaptersCache[cacheKey]) {
-            detailInner = detailCache[cacheKey];
-            epsInner = chaptersCache[cacheKey];
-          } else {
-            const [detailRes, epsRes] = await Promise.all([
-              fetch(apiUrl(`/api/series/${id}`, platform, { lang })),
-              fetch(apiUrl(`/api/series/${id}/episodes`, platform, { lang })),
-            ]);
-            detailInner = (await detailRes.json())?.data;
-            epsInner = (await epsRes.json())?.data;
-            detailCache[cacheKey] = detailInner;
-            chaptersCache[cacheKey] = epsInner;
-          }
-
-          const episodes = Array.isArray(epsInner) ? epsInner : (epsInner?.list || []);
-          setTotalEpisodes(detailInner?.max_series_no || episodes.length || 0);
-          setChapters(normalizeChapters(epsInner, platform));
-
-          // Find the episode ID to fetch play URL
-          const targetEp = episodes.find((e: any) => e.series_no === episode) || episodes[episode - 1];
-          if (targetEp) {
-            const playRes = await fetch(apiUrl(`/api/play/${id}/${targetEp.id}`, platform, { lang }));
-            const playData = await playRes.json();
-            const watchRaw = { ...detailInner, ...playData?.data };
-            setWatchData(normalizeWatchData(watchRaw, platform));
-          }
-        } else if (platform === 'dramapops') {
-          // DramaPops: /drama/:id for details, /drama/:id/episode/:ep/video for play
-          const cacheKey = `${platform}_${id}_${lang}`;
-
-          let drama;
-          if (detailCache[cacheKey]) {
-            drama = detailCache[cacheKey];
-          } else {
-            const detailRes = await fetch(apiUrl(`/api/drama/${id}`, platform, { lang }));
-            const detailData = await detailRes.json();
-            drama = detailData?.data;
-            detailCache[cacheKey] = drama;
-          }
-
-          const epCount = (drama?.episode_prices ? Object.keys(drama.episode_prices).length : 0) || drama?.totalEpisodes || 0;
-          setTotalEpisodes(epCount);
-          setChapters(normalizeChapters(null, platform, epCount));
-
-          // Fetch video for the episode
-          const playRes = await fetch(apiUrl(`/api/drama/${id}/episode/${episode}/video`, platform, { lang }));
-          const playData = await playRes.json();
-
-          const watchRaw = {
-            name: drama?.title || drama?.movie_unique_title || playData?.data?.slug,
-            cover: playData?.data?.poster || (drama?.poster_uri_prefix ? `${drama.poster_uri_prefix}${drama.poster_uri_suffix}` : '') || drama?.poster,
-            summary: drama?.description,
-            qualities: playData?.data?.qualities,
-          };
-          setWatchData(normalizeWatchData(watchRaw, platform));
-        } else if (platform === 'dramabite') {
-          // DramaBite: /api/v1/drama/:id for details, /api/v1/drama/:id/episode/:ep for play
-          // Detail returns: { id, cover, episodes: [{id, number, title, free}] } (root-level, NO drama title)
-          // Episode returns: { id, number, title, video: 'm3u8_url', validFor: 1800 }
-          const cacheKey = `${platform}_${id}_${lang}`;
-
-          let drama;
-          if (detailCache[cacheKey]) {
-            drama = detailCache[cacheKey];
-          } else {
-            const detailRes = await fetch(apiUrl(`/api/v1/drama/${id}`, platform, { lang }));
-            const detailData = await detailRes.json();
-            drama = Array.isArray(detailData) ? detailData[0] : (detailData?.data || detailData);
-            detailCache[cacheKey] = drama;
-          }
-
-          const episodes = drama?.episodes || [];
-          setTotalEpisodes(episodes.length);
-          setChapters(normalizeChapters(drama, platform));
-
-          const playRes = await fetch(apiUrl(`/api/v1/drama/${id}/episode/${episode}`, platform, { lang }));
-          const playData = await playRes.json(); // { id, number, title, video: 'url', validFor: 1800 }
-
-          // Get the episode title and cover from the episodes list if available
-          let finalCover = drama?.cover || drama?.thumbnail || drama?.poster || '';
-          if (!finalCover && episodes.length > 0) {
-            const firstEp = episodes[0];
-            finalCover = firstEp.cover || firstEp.thumbnail || firstEp.poster || '';
-          }
-
-          const watchRaw = {
-            ...playData, // title, video, etc.
-            cover: finalCover,
-            episodes: drama?.episodes, // for smarter normalization if title is missing
-          };
-          setWatchData(normalizeWatchData(watchRaw, platform));
-        } else if (platform === 'fundrama') {
-          // FunDrama: /api/drama/:id for details and episodes
-          const cacheKey = `${platform}_${id}_${lang}`;
-
-          let drama;
-          if (detailCache[cacheKey]) {
-            drama = detailCache[cacheKey];
-          } else {
-            const detailRes = await fetch(apiUrl(`/api/drama/${id}`, platform, { lang }));
-            const detailData = await detailRes.json();
-            drama = detailData?.data?.ddriv || {};
-            detailCache[cacheKey] = drama; // Cache the whole ddriv object
-          }
-
-          const epCount = drama?.btra?.eshe || 0;
-          setTotalEpisodes(epCount);
-          setChapters(normalizeChapters(null, platform, epCount));
-
-          // Find the right episode from eclim
-          const epData = drama?.eclim?.find((e: any) => e.erev === episode) || drama?.eclim?.[episode - 1];
-
-          const watchRaw = {
-            nsin: drama?.btra?.nsin,
-            ptear: drama?.btra?.ptear,
-            dentra: drama?.btra?.dentra,
-            eclimEp: epData // Pass the current episode's object
-          };
-          setWatchData(normalizeWatchData(watchRaw, platform));
-        } else {
-          // DramaBox: fetch chapters list + watch data
-          if (chapters.length === 0) {
-            const cacheKey = `${platform}_${id}_${lang}`;
-            let chaptersData;
-
-            if (chaptersCache[cacheKey]) {
-              chaptersData = chaptersCache[cacheKey];
-            } else {
-              const chaptersRes = await fetch(apiUrl(`/api/chapters/${id}`, platform, { lang }));
-              chaptersData = await chaptersRes.json();
-              chaptersCache[cacheKey] = chaptersData;
-            }
-
-            const normalizedChapters = normalizeChapters(chaptersData, platform);
-            setChapters(normalizedChapters);
-            setTotalEpisodes(normalizedChapters.length);
-          }
-
-          const watchRes = await fetch(apiUrl(`/api/watch/${id}/${episode}`, platform, { lang, direction: 1 }));
-          const watchResData = await watchRes.json();
-          if (watchResData.success) {
-            setWatchData(normalizeWatchData(watchResData.data, platform));
-          }
+        const isSuccess = homeData.success || homeData.data?.success || homeData.code === 0;
+        if (!isSuccess) {
+          setLoading(false);
+          return;
         }
+
+        const dramas = homeData.data?.data?.classifyBookList?.records ||
+                       homeData.data?.classifyBookList?.records ||
+                       homeData.data?.list ||
+                       homeData.list || [];
+
+        // Extract unique tags
+        const allTags = new Map<number, string>();
+        dramas.forEach((drama: Drama) => {
+          const tags = drama.tagV3s || drama.tagDetails || [];
+          tags.forEach((tag: TagDetail) => {
+            if (!allTags.has(tag.tagId) && allTags.size < 8) {
+              allTags.set(tag.tagId, tag.tagName);
+            }
+          });
+        });
+
+        // Fetch dramas for each category
+        const categoryPromises = Array.from(allTags).map(async ([tagId, tagName]) => {
+          try {
+            const response = await fetch(`/api/search?keyword=${encodeURIComponent(tagName)}&page=1&lang=${lang}&pageSize=12`);
+            const data = await response.json();
+            const isSuccess = data.success || data.data?.success || data.code === 0;
+            if (isSuccess) {
+              const list = data.data?.data?.searchList ||
+                           data.data?.data?.classifyBookList?.records ||
+                           data.data?.searchList ||
+                           data.data?.classifyBookList?.records ||
+                           data.data?.list ||
+                           data.list || [];
+              return { tagId, tagName, dramas: list.slice(0, 8) as Drama[] };
+            }
+            return { tagId, tagName, dramas: [] };
+          } catch {
+            return { tagId, tagName, dramas: [] };
+          }
+        });
+
+        const results = await Promise.all(categoryPromises);
+        setCategories(results.filter(cat => cat.dramas.length > 0));
       } catch (error) {
-        console.error('Failed to fetch watch data:', error);
+        console.error('Failed to fetch categories:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [id, episode, lang, platform]);
+    fetchCategories();
+  }, [lang]);
 
-  return { watchData, chapters, totalEpisodes, loading };
-};
-
-/* ===== Drama Likes ===== */
-export const useDramaLikes = (id: string | undefined) => {
-  const [likes, setLikes] = useState<number>(0);
-  const { platform } = usePlatform();
-
-  useEffect(() => {
-    if (!id || platform !== 'dramabite') return;
-
-    const fetchLikes = async () => {
-      try {
-        const response = await fetch(apiUrl(`/api/v1/drama/${id}/likes`, 'dramabite'));
-        const data = await response.json();
-        // DramaBite likes response: { id, likes } or similar
-        setLikes(data?.likes || 0);
-      } catch (err) {
-        console.error('Failed to fetch likes:', err);
-      }
-    };
-
-    fetchLikes();
-  }, [id, platform]);
-
-  return { likes };
+  return { categories, loading };
 };

@@ -1,31 +1,8 @@
 {
-  "framework": "vite",
-  "buildCommand": "vite build",
-  "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/download",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/sb-proxy",
-      "destination": "/api/index.js?action=sb-proxy"
-    },
-    {
-      "source": "/derive-key",
-      "destination": "/api/index.js?action=derive-key"
-    },
-    {
-      "source": "/img",
-      "destination": "/api/index.js?action=img"
-    },
-    {
-      "source": "/video",
-      "destination": "/api/index.js"
+      "source": "/api/:path*",
+      "destination": "/api/proxy"
     },
     {
       "source": "/(.*)",

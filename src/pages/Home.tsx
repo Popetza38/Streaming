@@ -1,543 +1,319 @@
-import { Play, Clock, Star } from 'lucide-react';
-import { useDramas, useInfiniteDramas, useRankDramas } from '../hooks/useDramas';
+import { Play, Users, Sparkles, ChevronRight, Loader2, Tag } from 'lucide-react';
+import { useDramas, useInfiniteDramas, useCategories } from '../hooks/useDramas';
 import { Link } from 'react-router-dom';
-import { useEffect, useCallback, useState } from 'react';
-import HeroBanner from '../components/HeroBanner';
-import Carousel from '../components/Carousel';
-import { useWatchHistory } from '../store/watchHistory';
-import { usePlatform, platforms } from '../store/platform';
-import { usePageMeta } from '../hooks/usePageMeta';
-import { useWatchlist } from '../store/watchlist';
-import { useAuth } from '../contexts/AuthContext';
-import { auth } from '@/lib/firebase';
-import type { NormalizedDrama } from '../utils/normalize';
-
-/* ===== Skeleton Loaders ===== */
-const SkeletonBanner = () => <div className="skeleton skeleton-banner" />;
-
-const SkeletonCards = ({ count = 6 }: { count?: number }) => (
-  <div className="carousel-scroll">
-    {Array.from({ length: count }).map((_, i) => (
-      <div key={i} className="skeleton-card">
-        <div className="skeleton skeleton-card-poster" />
-        <div className="skeleton skeleton-card-title" />
-        <div className="skeleton skeleton-card-sub" />
-      </div>
-    ))}
-  </div>
-);
-
-/* ===== Continue Watching Card ===== */
-const ContinueWatchingItem = ({ item }: { item: any }) => {
-  const progress = item.videoDuration > 0 ? (item.videoTime / item.videoDuration) * 100 : 0;
-  const timeAgo = getTimeAgo(item.timestamp);
-
-  return (
-    <Link
-      to={`/watch/${item.bookId}?p=${item.platform || 'dramabox'}&cw=${encodeURIComponent(item.cover || '')}`}
-      className="drama-card flex-shrink-0"
-      style={{ width: 140 }}
-    >
-      <div className="drama-poster relative bg-zinc-900">
-        <img
-          src={item.cover}
-          alt={item.bookName}
-          loading="lazy"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = '/logos/dramabite.png';
-            (e.target as HTMLImageElement).classList.add('p-8', 'opacity-30');
-          }}
-        />
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-zinc-700">
-          <div className="h-full bg-red-500 rounded-r" style={{ width: `${Math.min(progress, 100)}%` }} />
-        </div>
-        <div className="absolute top-1.5 left-1.5 w-5 h-5 rounded shadow-lg z-10 overflow-hidden" style={{ backgroundColor: item.platform === 'shortmax' ? '#7c3aed' : item.platform === 'flextv' ? '#3b82f6' : item.platform === 'dramapops' || item.platform === 'dramabite' ? '#10b981' : '#e50914' }}>
-          <img src={`/logos/${item.platform || 'dramabox'}.png`} alt="" className="w-full h-full object-contain" />
-        </div>
-        <div className="absolute top-1.5 right-1.5 bg-black/70 text-[10px] text-white px-1.5 py-0.5 rounded">
-          EP {item.episode}
-        </div>
-        <div className="drama-overlay">
-          <div className="drama-overlay-play">
-            <Play size={18} className="text-white ml-0.5" />
-          </div>
-        </div>
-      </div>
-      <h3 className="text-[11px] sm:text-xs font-medium line-clamp-2 mt-1.5 mb-1 h-7 sm:h-8 leading-tight">
-        {item.bookName.includes('-') && (item.bookName.split('-').pop()?.length || 0) < 4
-          ? item.bookName.split('-').slice(0, -1).join('-').trim()
-          : item.bookName.trim()}
-      </h3>
-      <div className="flex items-center gap-1 text-[10px] text-zinc-500">
-        <Clock size={10} />
-        <span>{timeAgo}</span>
-      </div>
-    </Link>
-  );
-};
-
-function getTimeAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
-}
-
-/* ===== Star Rating (inline) ===== */
-const InlineStarRating = ({ score }: { score: number }) => {
-  const fullStars = Math.floor(score);
-  const hasHalf = score - fullStars >= 0.5;
-  const emptyStars = 5 - fullStars - (hasHalf ? 1 : 0);
-
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: fullStars }).map((_, i) => (
-        <Star key={`f-${i}`} size={10} className="text-yellow-400 fill-yellow-400" />
-      ))}
-      {hasHalf && (
-        <div className="relative" style={{ width: 10, height: 10 }}>
-          <Star size={10} className="text-zinc-600 absolute inset-0" />
-          <div className="overflow-hidden absolute inset-0" style={{ width: '50%' }}>
-            <Star size={10} className="text-yellow-400 fill-yellow-400" />
-          </div>
-        </div>
-      )}
-      {Array.from({ length: emptyStars }).map((_, i) => (
-        <Star key={`e-${i}`} size={10} className="text-zinc-600" />
-      ))}
-      <span className="text-[10px] text-yellow-400 font-semibold ml-0.5">{score.toFixed(1)}</span>
-    </div>
-  );
-};
-
-/* ===== Drama Card (inline) ===== */
-const DramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: string }) => (
-  <Link
-    to={`/watch/${drama.id}?p=${platform}&cw=${encodeURIComponent(drama.cover || '')}`}
-    className="drama-card"
-    style={{ width: 150 }}
-  >
-    <div className="drama-poster">
-      <img src={drama.cover} alt={drama.name} loading="lazy" />
-      {drama.corner && (
-        <div
-          className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10"
-          style={{ backgroundColor: drama.corner.color }}
-        >
-          {drama.corner.name}
-        </div>
-      )}
-      {/* Episode badge */}
-      {drama.episodes && drama.episodes > 0 && (
-        <div className="absolute top-2 right-2 bg-black/70 text-[10px] text-white px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
-          {drama.episodes} EP
-        </div>
-      )}
-      {/* Language badges */}
-      {drama.hasThaiDub ? (
-        <div className="absolute bottom-2 right-2 bg-gradient-to-r from-blue-600 to-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
-          🇹🇭 พากย์ไทย
-        </div>
-      ) : drama.hasThaiSub && (
-        <div className="absolute bottom-2 right-2 bg-black/70 text-zinc-200 text-[9px] font-medium px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm border border-zinc-600/50">
-          📝 ซับไทย
-        </div>
-      )}
-      <div className="drama-overlay">
-        <div className="drama-overlay-play">
-          <Play size={18} className="text-white ml-0.5" />
-        </div>
-      </div>
-    </div>
-    <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-1">
-      {drama.name}
-    </h3>
-    {/* Tags */}
-    {drama.tags && drama.tags.length > 0 && (
-      <div className="flex flex-wrap gap-1 mb-1 h-3.5 overflow-hidden">
-        {drama.tags.slice(0, 2).map((tag, idx) => {
-          const label = typeof tag === 'string' ? tag : (tag as any)?.tag_name ?? '';
-          if (!label) return null;
-          return (
-            <span key={idx} className="text-[10px] px-1 font-medium bg-zinc-800 text-zinc-300 rounded leading-tight">
-              {label}
-            </span>
-          );
-        })}
-      </div>
-    )}
-    {/* Summary */}
-    {drama.summary && (
-      <p className="text-[10px] text-zinc-500 line-clamp-2 mb-1 leading-tight">
-        {drama.summary}
-      </p>
-    )}
-    {/* Score & Play Count */}
-    <div className="flex items-center justify-between">
-      {drama.score != null && drama.score > 0 ? (
-        <InlineStarRating score={drama.score} />
-      ) : <div />}
-      <div className="flex items-center gap-1 text-[10px] text-muted">
-        <span>{drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing'}</span>
-      </div>
-    </div>
-  </Link>
-);
-
-/* ===== Ranked Drama Card (Top 10) ===== */
-const RankedDramaItem = ({ drama, platform, rank }: { drama: NormalizedDrama; platform: string; rank: number }) => (
-  <Link
-    to={`/watch/${drama.id}?p=${platform}`}
-    className="drama-card relative"
-    style={{ width: 140 }}
-  >
-    {/* Large Rank Number */}
-    <div className="absolute -left-3 bottom-14 text-[80px] font-black leading-none tracking-tighter text-white drop-shadow-2xl z-20"
-      style={{ WebkitTextStroke: '2px rgba(255,255,255,0.2)', color: 'transparent', userSelect: 'none' }}>
-      {rank}
-    </div>
-
-    <div className="drama-poster ml-6">
-      <img src={drama.cover} alt={drama.name} loading="lazy" />
-      {drama.corner && (
-        <div
-          className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10"
-          style={{ backgroundColor: drama.corner.color }}
-        >
-          {drama.corner.name}
-        </div>
-      )}
-      {/* Episode badge */}
-      {drama.episodes && drama.episodes > 0 && (
-        <div className="absolute top-2 right-2 bg-black/70 text-[10px] text-white px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
-          {drama.episodes} EP
-        </div>
-      )}
-      {/* Language badges */}
-      {drama.hasThaiDub ? (
-        <div className="absolute bottom-2 right-2 bg-gradient-to-r from-blue-600 to-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
-          🇹🇭 พากย์ไทย
-        </div>
-      ) : drama.hasThaiSub && (
-        <div className="absolute bottom-2 right-2 bg-black/70 text-zinc-200 text-[9px] font-medium px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm border border-zinc-600/50">
-          📝 ซับไทย
-        </div>
-      )}
-      <div className="drama-overlay">
-        <div className="drama-overlay-play">
-          <Play size={18} className="text-white ml-0.5" />
-        </div>
-      </div>
-    </div>
-    <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-0.5 ml-6">
-      {drama.name}
-    </h3>
-    <div className="ml-6 flex items-center justify-between">
-      {drama.score != null && drama.score > 0 ? (
-        <InlineStarRating score={drama.score} />
-      ) : <div />}
-      <div className="flex items-center gap-1 text-[10px] text-muted">
-        <span>{drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing'}</span>
-      </div>
-    </div>
-  </Link>
-);
-
-/* ===== Grid Drama Card ===== */
-const GridDramaItem = ({ drama, platform }: { drama: NormalizedDrama; platform: string }) => (
-  <Link to={`/watch/${drama.id}?p=${platform}`} className="drama-card block">
-    <div className="drama-poster">
-      <img src={drama.cover} alt={drama.name} loading="lazy" />
-      {drama.corner && (
-        <div
-          className="absolute top-2 left-2 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10"
-          style={{ backgroundColor: drama.corner.color }}
-        >
-          {drama.corner.name}
-        </div>
-      )}
-      {drama.rank && (
-        <div className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10">
-          🔥 {drama.rank.hotCode}
-        </div>
-      )}
-      {/* Episode badge */}
-      {drama.episodes && drama.episodes > 0 && (
-        <div className="absolute top-2 right-2 bg-black/70 text-[10px] text-white px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
-          {drama.episodes} EP
-        </div>
-      )}
-      {/* Language badges */}
-      {drama.hasThaiDub ? (
-        <div className="absolute bottom-2 right-2 bg-gradient-to-r from-blue-600 to-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm">
-          🇹🇭 พากย์ไทย
-        </div>
-      ) : drama.hasThaiSub && (
-        <div className="absolute bottom-2 right-2 bg-black/70 text-zinc-200 text-[9px] font-medium px-1.5 py-0.5 rounded shadow-lg z-10 backdrop-blur-sm border border-zinc-600/50">
-          📝 ซับไทย
-        </div>
-      )}
-      <div className="drama-overlay">
-        <div className="drama-overlay-play">
-          <Play size={18} className="text-white ml-0.5" />
-        </div>
-      </div>
-    </div>
-    <h3 className="text-sm font-medium line-clamp-2 mt-2 mb-1">
-      {drama.name}
-    </h3>
-    {drama.tags && drama.tags.length > 0 && (
-      <div className="flex flex-wrap gap-1 mb-1 h-3.5 overflow-hidden">
-        {drama.tags.slice(0, 2).map((tag, idx) => {
-          const label = typeof tag === 'string' ? tag : (tag as any)?.tag_name ?? '';
-          if (!label) return null;
-          return (
-            <span key={idx} className="text-[10px] px-1 font-medium bg-zinc-800 text-zinc-300 rounded leading-tight">
-              {label}
-            </span>
-          );
-        })}
-      </div>
-    )}
-    {/* Summary */}
-    {drama.summary && (
-      <p className="text-[10px] text-zinc-500 line-clamp-2 mb-1 leading-tight">
-        {drama.summary}
-      </p>
-    )}
-    <div className="flex items-center justify-between">
-      {drama.score != null && drama.score > 0 ? (
-        <InlineStarRating score={drama.score} />
-      ) : <div />}
-      <div className="flex items-center gap-1 text-[10px] text-muted">
-        <span>{drama.playCount ? drama.playCount : (drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing')}</span>
-      </div>
-    </div>
-  </Link>
-);
+import { useEffect, useRef } from 'react';
 
 const Home = () => {
   const { dramas: featuredDramas, loading: featuredLoading } = useDramas();
-  const { dramas: rankDramas, loading: rankLoading } = useRankDramas();
   const { dramas, loading, loadingMore, hasMore, loadMore } = useInfiniteDramas();
-  const { history, save } = useWatchHistory();
-  const { items: watchlist, add: addToWatchlist } = useWatchlist();
-  const { user } = useAuth();
-  const { platform } = usePlatform();
-  const currentPlatformInfo = platforms.find(p => p.id === platform);
-  usePageMeta();
+  const { categories, loading: categoriesLoading } = useCategories();
+  const observerRef = useRef<HTMLDivElement>(null);
 
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const categories = ['All', 'Korean', 'Chinese', 'Thai', 'Japanese'];
-
-  const [banners, setBanners] = useState<any[]>([]);
-  const [bannersLoading, setBannersLoading] = useState(true);
-
-  // Fetch Carousel Banners
+  // Infinite scroll with Intersection Observer
   useEffect(() => {
-    fetch('/api/carousel')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) setBanners(data);
-        setBannersLoading(false);
-      })
-      .catch(e => {
-        console.error('Failed to fetch banners:', e);
-        setBannersLoading(false);
-      });
-  }, []);
-
-  // Sync watchlist and history from backend on load
-  useEffect(() => {
-    if (!user) return;
-    const syncData = async () => {
-      try {
-        const token = await auth.currentUser?.getIdToken();
-        // Sync Watchlist
-        const wlRes = await fetch('/api/user?type=watchlist', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (wlRes.ok) {
-          const data = await wlRes.json();
-          // Simple sync: just add items from backend that aren't in local
-          data.forEach((item: any) => addToWatchlist(item));
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0];
+        if (target.isIntersecting && hasMore && !loadingMore) {
+          loadMore();
         }
-
-        // Sync History
-        const histRes = await fetch('/api/user?type=history', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (histRes.ok) {
-          const data = await histRes.json();
-          data.forEach((item: any) => save(item));
-        }
-      } catch (e) {
-        console.error('Failed to sync user data:', e);
+      },
+      {
+        root: null,
+        rootMargin: '200px',
+        threshold: 0.1,
       }
-    }
-    syncData();
-  }, [user]);
+    );
 
-  // Infinite scroll
-  const handleScroll = useCallback(() => {
-    if (window.innerHeight + document.documentElement.scrollTop >= document.documentElement.offsetHeight - 1000) {
-      if (hasMore && !loadingMore) loadMore();
+    const currentObserver = observerRef.current;
+    if (currentObserver) {
+      observer.observe(currentObserver);
     }
+
+    return () => {
+      if (currentObserver) {
+        observer.unobserve(currentObserver);
+      }
+    };
   }, [hasMore, loadingMore, loadMore]);
 
-  useEffect(() => {
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [handleScroll]);
-
-  // Filter dramas by category
-  const filteredDramas = selectedCategory === 'All'
-    ? dramas
-    : dramas.filter(d => (d as any).category === selectedCategory);
+  if (featuredLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8 pt-2 pb-4">
-      {/* ===== Hero Banner ===== */}
-      {bannersLoading && featuredLoading ? (
-        <SkeletonBanner />
-      ) : (
-        <HeroBanner
-          banners={banners.length > 0 ? banners : undefined}
-          dramas={featuredDramas}
-        />
+    <div className="space-y-8 md:space-y-10 pt-2">
+      {/* Featured Hero Section */}
+      {featuredDramas[0] && (
+        <Link to={`/watch/${featuredDramas[0].bookId}`} className="block group">
+          <div className="relative aspect-[16/9] md:aspect-[21/9] rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl shadow-black/50">
+            <img
+              src={featuredDramas[0].coverWap || featuredDramas[0].cover}
+              alt={featuredDramas[0].bookName}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent" />
+
+            {/* Content */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 lg:p-10">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="inline-flex items-center gap-1.5 bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+                  <Sparkles size={12} />
+                  แนะนำสำหรับคุณ
+                </span>
+              </div>
+
+              <h1 className="text-xl md:text-3xl lg:text-4xl font-bold mb-2 md:mb-3 line-clamp-2 max-w-2xl">
+                {featuredDramas[0].bookName.trim()}
+              </h1>
+
+              <p className="text-sm md:text-base text-zinc-300 mb-4 line-clamp-2 max-w-xl hidden sm:block">
+                {featuredDramas[0].introduction}
+              </p>
+
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-2 bg-white text-black px-4 py-2.5 md:px-6 md:py-3 rounded-xl font-semibold text-sm md:text-base transition-all group-hover:bg-zinc-200">
+                  <Play size={18} fill="currentColor" />
+                  รับชมเลย
+                </span>
+                <span className="text-zinc-400 text-sm flex items-center gap-1 group-hover:text-white transition-colors">
+                  ดูเพิ่มเติม
+                  <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                </span>
+              </div>
+            </div>
+          </div>
+        </Link>
       )}
 
-      {/* ===== Category Tabs ===== */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide px-1">
-        {categories.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${selectedCategory === cat ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'bg-zinc-900 text-zinc-500 border border-zinc-800 hover:text-white hover:border-zinc-700'}`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
+      {/* For You Section */}
+      {featuredDramas.length > 1 && (
+        <section>
+          <div className="flex items-center justify-between mb-4 md:mb-5">
+            <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+              <span className="w-1 h-6 bg-red-500 rounded-full"></span>
+              แนะนำสำหรับคุณ
+            </h2>
+            <span className="text-sm text-zinc-500">{featuredDramas.length - 1} รายการ</span>
+          </div>
 
-      {/* ===== Continue Watching ===== */}
-      {history.filter(h => (h.platform || 'dramabox') === platform).length > 0 && (
-        <Carousel title={`${currentPlatformInfo?.icon || '⏯️'} Continue Watching · ${currentPlatformInfo?.name || 'DramaBox'}`}>
-          {history.filter(h => (h.platform || 'dramabox') === platform).slice(0, 10).map((item) => (
-            <ContinueWatchingItem key={item.bookId} item={item} />
-          ))}
-        </Carousel>
-      )}
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
+            {featuredDramas.slice(1, 13).map((drama, index) => (
+              <Link key={`foryou-${drama.bookId}-${index}`} to={`/watch/${drama.bookId}`} className="group">
+                <div className="relative aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden mb-2 md:mb-3 bg-zinc-900 shadow-lg">
+                  <img
+                    src={drama.coverWap || drama.cover}
+                    alt={drama.bookName}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    loading="lazy"
+                  />
 
-      {/* ===== My Watchlist ===== */}
-      {watchlist.length > 0 && (
-        <Carousel title="❤️ My Watchlist">
-          {watchlist.slice(0, 10).map((item) => (
-            <Link
-              key={item.id}
-              to={`/watch/${item.id}?p=${platform}&cw=${encodeURIComponent(item.image || '')}`}
-              className="flex-shrink-0 w-32 relative aspect-[3/4] rounded-lg overflow-hidden bg-zinc-900 shadow-lg active:scale-95 transition-transform"
-            >
-              <div className="drama-poster">
-                <img src={item.image} alt={item.title} loading="lazy" />
-                <div className="drama-overlay">
-                  <div className="drama-overlay-play">
-                    <Play size={18} className="text-white ml-0.5" />
+                  {/* Corner Badge */}
+                  {drama.corner && (
+                    <div
+                      className="absolute top-2 left-2 text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg shadow-lg backdrop-blur-sm"
+                      style={{ backgroundColor: drama.corner.color }}
+                    >
+                      {drama.corner.name}
+                    </div>
+                  )}
+
+                  {/* Rank Badge */}
+                  {drama.rank && (
+                    <div className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg shadow-lg backdrop-blur-sm">
+                      🔥 {drama.rank.hotCode}
+                    </div>
+                  )}
+
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                    <div className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transform scale-50 group-hover:scale-100 transition-transform duration-300">
+                      <Play size={24} className="text-white ml-1" fill="white" />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <h3 className="text-xs font-medium line-clamp-1 mt-1.5">{item.title}</h3>
-            </Link>
-          ))}
-        </Carousel>
+
+                <h3 className="text-xs md:text-sm font-medium line-clamp-2 mb-1 group-hover:text-red-400 transition-colors">
+                  {drama.bookName.trim()}
+                </h3>
+
+                <div className="flex items-center gap-1 text-xs text-zinc-500">
+                  <Users size={10} />
+                  <span>{drama.playCount}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
-      {/* ===== For You Carousel ===== */}
-      {featuredLoading ? (
-        <div>
-          <div className="skeleton" style={{ width: 100, height: 20, marginBottom: 14 }} />
-          <SkeletonCards />
-        </div>
-      ) : featuredDramas.length > 1 ? (
-        <Carousel title="🎬 For You">
-          {featuredDramas.slice(1).map((drama, i) => (
-            <DramaItem key={`fy-${drama.id}-${i}`} drama={drama} platform={platform} />
+      {/* Categories Sections */}
+      {!categoriesLoading && categories.length > 0 && (
+        <div className="space-y-8 md:space-y-10">
+          {categories.map((category) => (
+            <section key={category.tagId}>
+              <div className="flex items-center justify-between mb-4 md:mb-5">
+                <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                  <Tag size={18} className="text-red-500" />
+                  {category.tagName}
+                </h2>
+                <Link
+                  to={`/category`}
+                  className="text-sm text-zinc-500 hover:text-red-400 flex items-center gap-1 transition-colors"
+                >
+                  ดูทั้งหมด
+                  <ChevronRight size={16} />
+                </Link>
+              </div>
+
+              {/* Horizontal Scrollable Row */}
+              <div className="relative -mx-4 px-4">
+                <div className="flex gap-3 md:gap-4 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                  {category.dramas.map((drama, index) => (
+                    <Link
+                      key={`${category.tagId}-${drama.bookId}-${index}`}
+                      to={`/watch/${drama.bookId}`}
+                      className="group flex-shrink-0 snap-start w-32 sm:w-36 md:w-40"
+                    >
+                      <div className="relative aspect-[3/4] rounded-xl overflow-hidden mb-2 bg-zinc-900 shadow-lg">
+                        <img
+                          src={drama.coverWap || drama.cover}
+                          alt={drama.bookName}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          loading="lazy"
+                        />
+
+                        {/* Hover Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transform scale-50 group-hover:scale-100 transition-transform duration-300">
+                            <Play size={20} className="text-white ml-0.5" fill="white" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <h3 className="text-xs font-medium line-clamp-2 group-hover:text-red-400 transition-colors">
+                        {drama.bookName.trim()}
+                      </h3>
+                    </Link>
+                  ))}
+                </div>
+                {/* Fade edges */}
+                <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-zinc-950 to-transparent pointer-events-none" />
+              </div>
+            </section>
           ))}
-        </Carousel>
-      ) : null
-      }
+        </div>
+      )}
 
-      <div className="section-divider" />
-
-      {/* ===== Trending / Rank Carousel ===== */}
-      {
-        rankLoading ? (
-          <div>
-            <div className="skeleton" style={{ width: 120, height: 20, marginBottom: 14 }} />
-            <SkeletonCards />
+      {/* Loading Categories */}
+      {categoriesLoading && (
+        <div className="flex items-center justify-center py-8">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-6 h-6 text-red-500 animate-spin" />
+            <span className="text-sm text-zinc-500">กำลังโหลดหมวดหมู่...</span>
           </div>
-        ) : rankDramas.length > 0 ? (
-          <Carousel title="🔥 Top 10 Trending">
-            {rankDramas.slice(0, 10).map((drama, i) => (
-              <RankedDramaItem key={`rank-${drama.id}-${i}`} drama={drama} platform={platform} rank={i + 1} />
-            ))}
-          </Carousel>
-        ) : null
-      }
+        </div>
+      )}
 
-      <div className="section-divider" />
-
-      {/* ===== New Dramas Grid ===== */}
-      <div>
-        <h2 className="text-lg font-bold mb-4">✨ New Dramas</h2>
+      {/* New Dramas Section with Infinite Scroll */}
+      <section>
+        <div className="flex items-center justify-between mb-4 md:mb-5">
+          <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+            <span className="w-1 h-6 bg-red-500 rounded-full"></span>
+            ซีรีส์ใหม่ล่าสุด
+          </h2>
+          <span className="text-sm text-zinc-500">{dramas.length} รายการ</span>
+        </div>
 
         {loading && dramas.length === 0 ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i}>
-                <div className="skeleton" style={{ aspectRatio: '3/4', borderRadius: 10, marginBottom: 8 }} />
-                <div className="skeleton" style={{ height: 14, width: '80%', marginBottom: 6 }} />
-                <div className="skeleton" style={{ height: 10, width: '50%' }} />
-              </div>
-            ))}
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full"></div>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
-              {filteredDramas.map((drama, index) => (
-                <GridDramaItem key={`${drama.id}-${index}`} drama={drama} platform={platform} />
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
+              {dramas.map((drama, index) => (
+                <Link key={`${drama.bookId}-${index}`} to={`/watch/${drama.bookId}`} className="group">
+                  <div className="relative aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden mb-2 md:mb-3 bg-zinc-900 shadow-lg">
+                    <img
+                      src={drama.coverWap || drama.cover}
+                      alt={drama.bookName}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      loading="lazy"
+                    />
+
+                    {/* Corner Badge */}
+                    {drama.corner && (
+                      <div
+                        className="absolute top-2 left-2 text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg shadow-lg backdrop-blur-sm"
+                        style={{ backgroundColor: drama.corner.color }}
+                      >
+                        {drama.corner.name}
+                      </div>
+                    )}
+
+                    {/* Rank Badge */}
+                    {drama.rank && (
+                      <div className="absolute bottom-2 left-2 bg-red-500 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg shadow-lg backdrop-blur-sm">
+                        🔥 {drama.rank.hotCode}
+                      </div>
+                    )}
+
+                    {/* Hover Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                      <div className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transform scale-50 group-hover:scale-100 transition-transform duration-300">
+                        <Play size={24} className="text-white ml-1" fill="white" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <h3 className="text-xs md:text-sm font-medium line-clamp-2 mb-1 group-hover:text-red-400 transition-colors">
+                    {drama.bookName.trim()}
+                  </h3>
+
+                  <div className="flex items-center gap-1 text-xs text-zinc-500">
+                    <Users size={10} />
+                    <span>{drama.playCount}</span>
+                  </div>
+                </Link>
               ))}
             </div>
 
+            {/* Infinite Scroll Trigger */}
+            <div ref={observerRef} className="h-4" />
+
             {/* Loading More */}
             {loadingMore && (
-              <div className="flex items-center justify-center py-6">
-                <div className="animate-spin w-5 h-5 border-2 border-red-500 border-t-transparent rounded-full"></div>
-                <span className="ml-2 text-sm text-muted">Loading more...</span>
+              <div className="flex items-center justify-center py-8 md:py-10">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
+                  <span className="text-sm text-zinc-500 animate-pulse">กำลังโหลดซีรีส์เพิ่ม...</span>
+                </div>
               </div>
             )}
 
-            {hasMore && !loadingMore && (
-              <div className="text-center py-6">
-                <button onClick={loadMore} className="btn-primary">
-                  Load More ({dramas.length} loaded)
-                </button>
-              </div>
-            )}
-
+            {/* End of Content */}
             {!hasMore && dramas.length > 0 && (
-              <div className="text-center py-6 text-sm text-muted">
-                All dramas loaded ({dramas.length} total)
+              <div className="text-center py-8 md:py-10">
+                <div className="inline-flex flex-col items-center gap-2">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-900/50 rounded-full text-sm text-zinc-500">
+                    <Sparkles size={14} className="text-yellow-500" />
+                    <span>โหลดทั้งหมดแล้ว ({dramas.length} รายการ)</span>
+                  </div>
+                  <p className="text-xs text-zinc-600">เลื่อนขึ้นด้านบนเพื่อดูซีรีส์ทั้งหมด</p>
+                </div>
               </div>
             )}
           </>
         )}
-      </div>
-    </div >
+      </section>
+    </div>
   );
 };
 

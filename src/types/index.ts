@@ -15,24 +15,11 @@ export interface Drama {
   tagDetails: Tag[]
 }
 
-export interface Chapter {
-  chapterId: string
-  chapterIndex: number
-  isCharge: number
-  isPay: number
-}
-
-export interface VideoQuality {
-  quality: number
-  videoPath: string
-  isDefault: number
-}
-
-export interface WatchData {
-  bookId: string
-  chapterIndex: number
-  videoUrl: string
-  qualities: VideoQuality[]
-  cover: string
-  bookName: string
+export interface Episode {
+  episodeId?: string
+  chapterId?: string
+  episodeIndex?: number
+  chapterIndex?: number
+  videoUrl?: string
+  title?: string
 }

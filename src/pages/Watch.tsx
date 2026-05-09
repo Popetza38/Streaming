@@ -1,445 +1,425 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Share2, Heart } from 'lucide-react';
-import Swal from 'sweetalert2';
-import { usePlatform } from '../store/platform';
-import type { Platform } from '../store/platform';
-import { useWatchHistory } from '../store/watchHistory';
-import { useWatchlist } from '../store/watchlist';
-import { useWatchData, useDramaLikes } from '../hooks/useDramas';
-import VideoPlayer from '../components/VideoPlayer';
-import { usePageMeta } from '../hooks/usePageMeta';
-import { useMembership } from '../hooks/useMembership';
-import { useAuth } from '../contexts/AuthContext';
-import MembershipModal from '../components/MembershipModal';
-import ReviewSection from '../components/ReviewSection';
-import { auth } from '@/lib/firebase';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Share2,
+  Heart,
+  Eye,
+  ListVideo,
+  SkipForward,
+  SkipBack
+} from 'lucide-react';
+import { useLanguage } from '../store/language';
+
+interface Episode {
+  episodeId?: string;
+  chapterId?: string;
+  episodeIndex?: number;
+  chapterIndex?: number;
+  episode?: number;
+  videoUrl?: string;
+  url?: string;
+  title?: string;
+  chapterName?: string;
+}
+
+interface DramaDetail {
+  bookName: string;
+  cover?: string;
+  bookCover?: string;
+  coverWap?: string;
+  introduction: string;
+}
 
 const Watch = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [currentChapter, setCurrentChapter] = useState(1);
-  const [initialTime, setInitialTime] = useState(0);
-  const { platform, setPlatform } = usePlatform();
-  const { save, getItem } = useWatchHistory();
-  const { toggle: toggleWatchlist, contains: isInWatchlist } = useWatchlist();
-  const saveTimerRef = useRef<ReturnType<typeof setInterval>>();
-  const lastTimeRef = useRef({ time: 0, duration: 0 });
-  const [showMembershipModal, setShowMembershipModal] = useState(false);
-  const { user, profile } = useAuth();
+  const [currentEpisode, setCurrentEpisode] = useState(1);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [dramaDetail, setDramaDetail] = useState<DramaDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
+  const [showAllEpisodes, setShowAllEpisodes] = useState(false);
+  const { lang } = useLanguage();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Compute effective platform synchronously from URL param
-  const validPlatforms: Platform[] = ['dramabox', 'shortmax', 'shortbox', 'flextv', 'dramapops'];
-  const urlPlatform = searchParams.get('p') as Platform | null;
-  const effectivePlatform = (urlPlatform && validPlatforms.includes(urlPlatform)) ? urlPlatform : platform;
-
-  // Sync URL platform to store (so other components stay consistent)
-  useEffect(() => {
-    if (effectivePlatform !== platform) {
-      setPlatform(effectivePlatform);
-    }
-  }, [effectivePlatform]);
-
-  const { watchData, chapters, totalEpisodes, loading: watchLoading } = useWatchData(id, currentChapter, effectivePlatform);
-  const { likes } = useDramaLikes(id);
-  const { hasPurchased, recordView, unlockDrama, loading: membershipLoading } = useMembership(id, effectivePlatform);
-  const [unlockLoading, setUnlockLoading] = useState(false);
-
-  const handlePurchase = async () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    setUnlockLoading(true);
-    const result = await unlockDrama(10); // Standard price 10 coins
-    setUnlockLoading(false);
-
-    if (result.success) {
-      Swal.fire({
-        icon: 'success',
-        title: 'ปลดล็อกสำเร็จ!',
-        text: 'ขอให้สนุกกับการรับชมครับ',
-        timer: 2000,
-        showConfirmButton: false,
-        background: '#18181b',
-        color: '#fff'
-      });
-    } else {
-      Swal.fire({
-        icon: 'error',
-        title: 'ปลดล็อกไม่สำเร็จ',
-        text: result.error || 'เกิดข้อผิดพลาดบางอย่าง',
-        background: '#18181b',
-        color: '#fff'
-      });
-    }
-  };
-
-  usePageMeta(
-    watchData ? `${watchData.name} EP ${currentChapter}` : 'Loading...',
-    watchData?.summary,
-    watchData?.cover
-  );
-
-  // Resume from watch history on first load
   useEffect(() => {
     if (!id) return;
-    const saved = getItem(id);
-    if (saved) {
-      setCurrentChapter(saved.episode);
-      setInitialTime(saved.videoTime);
-    }
-  }, [id]);
 
-  // Record viewing history to Supabase when viewing a new chapter
-  useEffect(() => {
-    if (user && watchData && id && currentChapter <= 10) {
-      recordView(currentChapter);
-    }
-  }, [currentChapter, watchData, user, id]);
-
-  // Check 10 episodes limit
-  useEffect(() => {
-    if (currentChapter > 10 && !hasPurchased && !membershipLoading) {
-      setShowMembershipModal(true);
-    } else {
-      setShowMembershipModal(false);
-    }
-  }, [currentChapter, hasPurchased, membershipLoading]);
-
-  // Save progress every 5 seconds
-  useEffect(() => {
-    const syncToBackend = async (data: any) => {
-      if (!user) return;
+    const fetchData = async () => {
+      setIsTransitioning(true);
       try {
-        const token = await auth.currentUser?.getIdToken();
-        await fetch('/api/user', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            action: 'update_history',
-            dramaId: id,
-            dramaData: data
-          })
-        });
-      } catch (e) {
-        console.error('History sync failed:', e);
+        // Fetch drama detail
+        const detailResponse = await fetch(`/api/drama/${id}?lang=${lang}`);
+        const detailData = await detailResponse.json();
+        const isDetailSuccess = detailData.success || detailData.data?.success || detailData.code === 0;
+        if (isDetailSuccess) {
+          // Note: detailData contains chapter metadata (bookStatus, performers, ratingConf)
+          // We don't set dramaDetail here because it lacks bookName and cover.
+          // We will extract dramaDetail from the episodes API response instead.
+          console.log('Drama detail metadata loaded');
+        }
+
+        // Fetch episodes
+        const episodesResponse = await fetch(`/api/drama/${id}/episodes?lang=${lang}`);
+        const episodesData = await episodesResponse.json();
+        const isEpisodesSuccess = episodesData.success || episodesData.data?.success || episodesData.code === 0;
+        
+        if (isEpisodesSuccess) {
+          // episodesData.data contains bookName, cover, description, and episodes array
+          const episodesObj = episodesData.data?.data || episodesData.data;
+          
+          if (episodesObj) {
+            setDramaDetail({
+              bookName: episodesObj.bookName || detailData.data?.bookName || 'Unknown Drama',
+              cover: episodesObj.cover || episodesObj.coverWap || detailData.data?.cover || '',
+              introduction: episodesObj.description || episodesObj.introduction || detailData.data?.introduction || ''
+            });
+
+            const list = episodesObj.book?.episodeList || 
+                         episodesObj.episodeList || 
+                         episodesObj.episodes || 
+                         episodesObj.chapterList || [];
+            setEpisodes(list);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch watch data:', error);
+      } finally {
+        setLoading(false);
+        setIsTransitioning(false);
       }
     };
 
-    saveTimerRef.current = setInterval(() => {
-      if (!id || !watchData || lastTimeRef.current.time <= 0) return;
+    fetchData();
+  }, [id, lang]);
 
-      const urlCover = searchParams.get('cw');
-      const historyData = {
-        bookId: id,
-        bookName: watchData.name,
-        cover: watchData.cover || urlCover || '',
-        episode: currentChapter,
-        totalEpisodes: totalEpisodes,
-        videoTime: lastTimeRef.current.time,
-        videoDuration: lastTimeRef.current.duration,
-        platform,
-      };
-      save(historyData);
-      syncToBackend(historyData);
-    }, 5000);
-
-    return () => {
-      if (saveTimerRef.current) clearInterval(saveTimerRef.current);
-      // Save on unmount
-      if (id && watchData && lastTimeRef.current.time > 0) {
-        const urlCover = searchParams.get('cw');
-        const historyData = {
-          bookId: id,
-          bookName: watchData.name,
-          cover: watchData.cover || urlCover || '',
-          episode: currentChapter,
-          totalEpisodes: totalEpisodes,
-          videoTime: lastTimeRef.current.time,
-          videoDuration: lastTimeRef.current.duration,
-          platform,
-        };
-        save(historyData);
-        syncToBackend(historyData);
-      }
-    };
-  }, [id, watchData, currentChapter, totalEpisodes, save, user]);
-
-  const handleTimeUpdate = useCallback((time: number, dur: number) => {
-    lastTimeRef.current = { time, duration: dur };
-  }, []);
-
-  const handleChapterChange = (chapterIndex: number) => {
-    setInitialTime(0);
-    setCurrentChapter(chapterIndex);
+  const handleEpisodeChange = (episodeIndex: number) => {
+    setCurrentEpisode(episodeIndex);
   };
 
   const handlePrevious = () => {
-    if (currentChapter > 1) {
-      setInitialTime(0);
-      setCurrentChapter(currentChapter - 1);
+    if (currentEpisode > 1) {
+      setCurrentEpisode(currentEpisode - 1);
     }
   };
 
   const handleNext = () => {
-    if (currentChapter < totalEpisodes) {
-      setInitialTime(0);
-      setCurrentChapter(currentChapter + 1);
+    if (currentEpisode < episodes.length) {
+      setCurrentEpisode(currentEpisode + 1);
     }
   };
 
-  const handleShare = async () => {
-    if (!watchData) return;
-    const shareData = {
-      title: `${watchData.name} - DramaBox`,
-      text: `Watch ${watchData.name} Episode ${currentChapter} online!`,
-      url: window.location.href,
-    };
-
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-      } else {
-        await navigator.clipboard.writeText(window.location.href);
-        Swal.fire({
-          toast: true,
-          position: 'top-end',
-          icon: 'success',
-          title: 'Link copied to clipboard',
-          showConfirmButton: false,
-          timer: 2000,
-          background: '#18181b',
-          color: '#fff'
-        });
-      }
-    } catch (err) {
-      console.error('Error sharing:', err);
+  const handleVideoEnded = () => {
+    if (currentEpisode < episodes.length) {
+      setCurrentEpisode(currentEpisode + 1);
     }
   };
 
-  // Build video URL — platform-specific proxying
-  const getVideoSrc = () => {
-    if (!watchData?.videoUrl) return '';
-    // ShortBox: URLs already proxied through /sb-proxy in useDramas
-    if (platform === 'shortbox') {
-      return watchData.videoUrl;
-    }
-    // ShortMax: proxy HLS through /video
-    if (watchData.isHls && platform === 'shortmax') {
-      return `/video?url=${encodeURIComponent(watchData.videoUrl.replace('https://', ''))}`;
-    }
-    return watchData.videoUrl;
-  };
-
-  useEffect(() => {
-    if (watchLoading || membershipLoading) {
-      Swal.fire({
-        title: 'กำลังโหลดข้อมูล...',
-        allowOutsideClick: false,
-        showConfirmButton: false,
-        background: 'transparent',
-        color: '#fff',
-        backdrop: 'rgba(0,0,0,0.8)',
-        target: (document.fullscreenElement as HTMLElement) || document.body,
-        didOpen: () => {
-          Swal.showLoading();
-        }
-      });
-    } else {
-      if (Swal.isVisible() && Swal.getTitle()?.textContent === 'กำลังโหลดข้อมูล...') {
-        Swal.close();
-      }
-    }
-  }, [watchLoading, membershipLoading]);
-
-  if (!watchData) {
-    if (watchLoading) return null;
+  if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 flex flex-col items-center justify-center">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-zinc-800 border-t-red-500 rounded-full animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Play size={24} className="text-red-500" fill="currentColor" />
+          </div>
+        </div>
+        <p className="mt-4 text-zinc-500 animate-pulse">กำลังโหลดซีรีส์...</p>
+      </div>
+    );
+  }
+
+  if (!dramaDetail) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-zinc-400 mb-4">Drama not found</p>
-          <button onClick={() => navigate('/')} className="btn-primary">
-            Back to Home
+          <div className="w-20 h-20 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4">
+            <ListVideo size={40} className="text-zinc-600" />
+          </div>
+          <p className="text-zinc-400 mb-4 text-lg">ไม่พบซีรีส์</p>
+          <button
+            onClick={() => navigate('/')}
+            className="px-6 py-3 bg-red-500 hover:bg-red-400 text-white rounded-xl font-medium transition-all"
+          >
+            กลับหน้าแรก
           </button>
         </div>
       </div>
     );
   }
 
+  const currentEpisodeData = episodes[currentEpisode - 1];
+  const videoUrl = currentEpisodeData?.url || currentEpisodeData?.videoUrl || '';
+  const progress = episodes.length > 0 ? (currentEpisode / episodes.length) * 100 : 0;
+
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-zinc-900 to-zinc-950">
       {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800 safe-area-top">
-        <div className="flex items-center justify-between h-12 sm:h-14 px-3 sm:px-4">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-b from-black/80 to-transparent backdrop-blur-md">
+        <div className="flex items-center justify-between h-16 px-4 max-w-7xl mx-auto">
           <button
             onClick={() => navigate('/')}
-            className="p-2 hover:bg-zinc-800 active:bg-zinc-700 rounded-xl transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-black/40 hover:bg-black/60 rounded-xl transition-all active:scale-95 group"
           >
-            <ArrowLeft size={20} className="text-white" />
+            <ArrowLeft size={18} className="text-white group-hover:-translate-x-0.5 transition-transform" />
+            <span className="text-white text-sm hidden sm:block">กลับ</span>
           </button>
-          <h1 className="font-semibold text-white line-clamp-1 flex-1 mx-3 text-sm">
-            {watchData.name}
-          </h1>
-          <span className="text-xs text-zinc-500 whitespace-nowrap">
-            EP {currentChapter}/{totalEpisodes}
-          </span>
+
+          <div className="flex-1 mx-4 text-center">
+            <h1 className="font-semibold text-white text-sm md:text-base line-clamp-1">
+              {dramaDetail.bookName}
+            </h1>
+            <p className="text-xs text-zinc-400 hidden sm:block">
+              ตอนที่ {currentEpisode} จาก {episodes.length}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsLiked(!isLiked)}
+              className={`p-2.5 rounded-xl transition-all ${
+                isLiked ? 'bg-red-500/20 text-red-500' : 'bg-black/40 hover:bg-black/60 text-white'
+              }`}
+            >
+              <Heart size={18} fill={isLiked ? 'currentColor' : 'none'} />
+            </button>
+            <button className="p-2.5 bg-black/40 hover:bg-black/60 text-white rounded-xl transition-all">
+              <Share2 size={18} />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Main Layout */}
-      <div className="pt-12 sm:pt-14">
-        <div className="lg:flex lg:h-[calc(100vh-56px)]">
-          <div className="lg:flex-1 lg:min-w-0 lg:flex lg:items-center lg:justify-center lg:bg-black relative">
-            <div className="w-full lg:h-full lg:flex lg:items-center lg:justify-center">
-              <div className={`w-full max-w-[500px] mx-auto lg:max-w-none lg:h-full transition-all ${showMembershipModal ? 'blur-md pointer-events-none opacity-50' : ''}`}>
-                <VideoPlayer
-                  src={getVideoSrc()}
-                  poster={watchData.cover}
-                  autoPlay={!showMembershipModal}
-                  hasNext={currentChapter < totalEpisodes}
-                  hasPrevious={currentChapter > 1}
-                  onNext={handleNext}
-                  onPrevious={handlePrevious}
-                  episodeInfo={`EP ${currentChapter} / ${totalEpisodes}`}
-                  initialTime={initialTime}
-                  onTimeUpdate={handleTimeUpdate}
-                  downloadUrl={
-                    watchData.videoUrl
-                      ? watchData.isHls
-                        ? `/download?url=${encodeURIComponent(watchData.videoUrl.replace('https://', ''))}`
-                        : watchData.videoUrl
-                      : undefined
-                  }
-                  downloadFileName={`${watchData.name}_EP${currentChapter}.mp4`}
+      <div className="pt-14 xl:flex xl:gap-6 xl:max-w-7xl xl:mx-auto xl:p-6 xl:pt-20">
+        {/* Left: Video Player */}
+        <div className="relative xl:flex-1 xl:max-w-lg xl:sticky xl:top-20 xl:self-start">
+          {/* Transition Overlay */}
+          {isTransitioning && (
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-lg flex items-center justify-center z-20 rounded-2xl">
+              <div className="text-center">
+                <div className="relative w-16 h-16 mx-auto mb-4">
+                  <div className="absolute inset-0 border-4 border-zinc-800 border-t-red-500 rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-red-500 font-bold text-sm">{currentEpisode}</span>
+                  </div>
+                </div>
+                <p className="text-white font-medium">กำลังโหลดตอนที่ {currentEpisode}...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Video Container */}
+          <div className="relative bg-black flex justify-center xl:rounded-2xl xl:overflow-hidden xl:border xl:border-white/10 shadow-2xl shadow-black/50">
+            <div className="w-full md:max-w-lg lg:max-w-xl xl:max-w-none">
+              {videoUrl ? (
+                <video
+                  ref={videoRef}
+                  key={videoUrl}
+                  src={videoUrl}
+                  poster={dramaDetail.coverWap || dramaDetail.cover || ''}
+                  controls
+                  autoPlay
+                  playsInline
+                  onEnded={handleVideoEnded}
+                  className="w-full aspect-[9/16] object-contain bg-black xl:aspect-auto xl:max-h-[75vh]"
+                />
+              ) : (
+                <div className="w-full aspect-[9/16] flex items-center justify-center bg-gradient-to-b from-zinc-900 to-black xl:max-h-[75vh]">
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-zinc-800/30">
+                      <Play size={32} className="text-zinc-500 ml-1" />
+                    </div>
+                    <p className="text-zinc-400 font-medium">ไม่มีวิดีโอ</p>
+                    <p className="text-zinc-600 text-sm mt-1">ตอนนี้ยังไม่พร้อมให้รับชม</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Actions Below Video */}
+          <div className="hidden xl:flex items-center justify-center gap-3 mt-4">
+            <button
+              onClick={handlePrevious}
+              disabled={currentEpisode <= 1}
+              className="flex items-center gap-2 px-4 py-2 bg-zinc-800/50 hover:bg-zinc-700/50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm transition-all"
+            >
+              <SkipBack size={16} />
+              ตอนก่อน
+            </button>
+            <div className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg text-sm font-medium">
+              ตอนที่ {currentEpisode}
+            </div>
+            <button
+              onClick={handleNext}
+              disabled={currentEpisode >= episodes.length}
+              className="flex items-center gap-2 px-4 py-2 bg-zinc-800/50 hover:bg-zinc-700/50 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm transition-all"
+            >
+              ตอนถัดไป
+              <SkipForward size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Content */}
+        <div className="p-4 space-y-5 xl:flex-1 xl:max-w-xl xl:p-0">
+          {/* Drama Info Card */}
+          <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 rounded-2xl p-4 md:p-6 border border-white/5 shadow-xl">
+            <h2 className="text-xl md:text-2xl font-bold text-white mb-3">{dramaDetail.bookName}</h2>
+
+            {/* Episode Progress */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between text-xs text-zinc-500 mb-2">
+                <span>ความคืบหน้า</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-red-500 to-red-400 rounded-full transition-all duration-500"
+                  style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
 
-            <MembershipModal
-              isOpen={showMembershipModal}
-              onClose={() => handlePrevious()}
-              onPurchase={handlePurchase}
-              userCoins={profile?.coins || 0}
-              loading={unlockLoading}
-            />
-          </div>
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              <span className="px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs md:text-sm font-bold rounded-full shadow-lg shadow-red-500/20">
+                EP.{currentEpisode} / {episodes.length}
+              </span>
+              {currentEpisodeData?.title && (
+                <span className="text-zinc-400 text-xs md:text-sm truncate max-w-[200px]">
+                  {currentEpisodeData.title}
+                </span>
+              )}
+            </div>
 
-          <div className="lg:w-[360px] xl:w-[400px] lg:border-l lg:border-zinc-800 lg:overflow-y-auto lg:flex-shrink-0">
-            <div className="p-3 sm:p-4 space-y-4 lg:space-y-5">
-              <div>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-base sm:text-lg font-bold mb-1 line-clamp-2">{watchData.name}</h2>
-                    <span className="text-xs sm:text-sm text-zinc-400">
-                      Episode {currentChapter} of {totalEpisodes}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <button
-                      onClick={() => {
-                        if (!id || !watchData) return;
-                        toggleWatchlist({
-                          id: id,
-                          title: watchData.name,
-                          image: watchData.cover,
-                          addedAt: new Date().toISOString()
-                        });
-                        // Also sync to backend
-                        if (user) {
-                          auth.currentUser?.getIdToken().then(token => {
-                            fetch('/api/user', {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${token}`
-                              },
-                              body: JSON.stringify({
-                                action: isInWatchlist(id) ? 'remove_watchlist' : 'add_watchlist',
-                                dramaId: id,
-                                dramaData: {
-                                  title: watchData.name,
-                                  image: watchData.cover
-                                }
-                              })
-                            });
-                          });
-                        }
-                      }}
-                      className={`p-2 sm:p-2.5 rounded-xl transition-all flex-shrink-0 border flex items-center gap-1.5 ${isInWatchlist(id || '') ? 'bg-red-500/10 border-red-500/50 text-red-500' : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700'}`}
-                      title="Add to List"
-                    >
-                      <Heart size={18} fill={isInWatchlist(id || '') ? 'currentColor' : 'none'} />
-                      {effectivePlatform === 'dramabite' && likes > 0 && (
-                        <span className="text-xs font-bold">{likes}</span>
-                      )}
-                    </button>
-                    <button
-                      onClick={handleShare}
-                      className="p-2 sm:p-2.5 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 border border-zinc-700 rounded-xl transition-all flex-shrink-0"
-                      title="Share"
-                    >
-                      <Share2 size={18} className="text-zinc-300" />
-                    </button>
-                  </div>
-                </div>
-                {watchData.summary && (
-                  <p className="text-xs sm:text-sm text-zinc-300 line-clamp-3 mt-2">
-                    {watchData.summary}
-                  </p>
-                )}
+            {dramaDetail.introduction && (
+              <div className="relative">
+                <p className="text-sm md:text-base text-zinc-400 leading-relaxed line-clamp-3">
+                  {dramaDetail.introduction}
+                </p>
+                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-zinc-900/80 to-transparent" />
               </div>
+            )}
 
-              <div className="flex gap-2 sm:gap-3">
-                <button
-                  onClick={handlePrevious}
-                  disabled={currentChapter <= 1}
-                  className="flex-1 py-2.5 sm:py-3 bg-zinc-800 hover:bg-zinc-700 active:bg-zinc-600 disabled:opacity-40 disabled:pointer-events-none rounded-xl flex items-center justify-center gap-1.5 transition-colors active:scale-[0.97]"
-                >
-                  <ChevronLeft size={16} />
-                  <span className="font-medium text-sm">Previous</span>
-                </button>
-                <button
-                  onClick={handleNext}
-                  disabled={currentChapter >= totalEpisodes}
-                  className="flex-1 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:opacity-40 disabled:pointer-events-none rounded-xl flex items-center justify-center gap-1.5 transition-colors text-white font-medium text-sm active:scale-[0.97]"
-                >
-                  <span>Next</span>
-                  <ChevronRight size={16} />
-                </button>
+            {/* Stats */}
+            <div className="flex items-center gap-4 mt-4 pt-4 border-t border-white/5">
+              <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                <ListVideo size={14} />
+                <span>{episodes.length} ตอน</span>
               </div>
-
-              <div>
-                <h3 className="font-semibold text-sm mb-2">All Episodes</h3>
-                <div className="grid grid-cols-6 sm:grid-cols-8 lg:grid-cols-6 xl:grid-cols-7 gap-1.5 sm:gap-2 max-h-52 sm:max-h-64 lg:max-h-none overflow-y-auto scrollbar-hide">
-                  {(chapters.length > 0 ? chapters : Array.from({ length: totalEpisodes }, (_, i) => ({ id: String(i), index: i }))).map((chapter) => {
-                    const episodeNum = chapter.index + 1;
-                    return (
-                      <button
-                        key={chapter.id}
-                        onClick={() => handleChapterChange(episodeNum)}
-                        className={`aspect-square rounded-lg text-xs sm:text-sm font-medium transition-all active:scale-95 ${currentChapter === episodeNum
-                          ? 'bg-red-500 text-white ring-2 ring-red-400/50'
-                          : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 active:bg-zinc-600'
-                          }`}
-                      >
-                        {episodeNum}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                <Eye size={14} />
+                <span>กำลังรับชม</span>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Rating & Reviews Section */}
-        <ReviewSection dramaId={id} />
+          {/* Navigation Buttons */}
+          <div className="flex gap-3 md:gap-4">
+            <button
+              onClick={handlePrevious}
+              disabled={currentEpisode <= 1 || isTransitioning}
+              className="flex-1 py-3.5 md:py-4 bg-zinc-800/80 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] text-sm md:text-base font-medium group"
+            >
+              <ChevronLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
+              <span>ตอนก่อน</span>
+            </button>
+            <button
+              onClick={handleNext}
+              disabled={currentEpisode >= episodes.length || isTransitioning}
+              className="flex-1 py-3.5 md:py-4 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] text-white text-sm md:text-base font-medium shadow-lg shadow-red-500/25 group"
+            >
+              <span>ตอนถัดไป</span>
+              <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </div>
+
+          {/* Episode List */}
+          <div className="bg-gradient-to-br from-zinc-900/50 to-zinc-950/50 rounded-2xl p-4 md:p-5 border border-white/5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <ListVideo size={20} className="text-red-500" />
+                <h3 className="font-semibold text-white md:text-lg">รายการตอน</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs md:text-sm text-zinc-500">{episodes.length} ตอน</span>
+                {episodes.length > 12 && (
+                  <button
+                    onClick={() => setShowAllEpisodes(!showAllEpisodes)}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                  >
+                    {showAllEpisodes ? 'แสดงน้อย' : 'ดูทั้งหมด'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className={`grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 xl:grid-cols-8 gap-1.5 md:gap-2 overflow-y-auto pr-1 transition-all duration-300 ${
+              showAllEpisodes ? 'max-h-96' : 'max-h-60'
+            }`}>
+              {episodes.map((episode: Episode, index: number) => {
+                const epNum = episode.episode ?? (episode.episodeIndex ?? episode.chapterIndex ?? index) + 1;
+                const isActive = currentEpisode === epNum;
+                const isWatched = epNum < currentEpisode;
+
+                return (
+                  <button
+                    key={episode.episodeId || episode.chapterId || epNum}
+                    onClick={() => handleEpisodeChange(epNum)}
+                    disabled={isTransitioning}
+                    className={`relative rounded-lg text-xs md:text-sm font-medium transition-all overflow-hidden ${
+                      isActive
+                        ? 'bg-gradient-to-br from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30 scale-105 ring-2 ring-red-500/50'
+                        : isWatched
+                          ? 'bg-zinc-700/80 text-zinc-300 hover:bg-zinc-600'
+                          : 'bg-zinc-800/80 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+                    } ${isTransitioning ? 'opacity-40 cursor-not-allowed' : 'active:scale-95'}`}
+                  >
+                    {/* Episode Number */}
+                    <div className="aspect-square flex items-center justify-center">
+                      <span>{epNum}</span>
+                    </div>
+
+                    {/* Active Indicator */}
+                    {isActive && (
+                      <div className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full animate-pulse" />
+                    )}
+
+                    {/* Watched Indicator */}
+                    {isWatched && !isActive && (
+                      <div className="absolute bottom-1 right-1">
+                        <div className="w-1.5 h-1.5 bg-zinc-500 rounded-full" />
+                      </div>
+                    )}
+
+                    {/* Episode Title (if available) */}
+                    {episode.title && isActive && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm py-0.5 px-1">
+                        <p className="text-[9px] truncate text-center">{episode.title}</p>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Episode Info */}
+            {currentEpisodeData?.title && (
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <p className="text-sm text-zinc-400">
+                  <span className="text-zinc-500">ตอนที่ {currentEpisode}:</span>{' '}
+                  <span className="text-white">{currentEpisodeData.title}</span>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

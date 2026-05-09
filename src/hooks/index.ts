@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import api from '@/api/client'
-import type { Drama, Chapter, WatchData } from '@/types'
+import type { Drama, Episode } from '@/types'
 
 export function useForYou(page = 1) {
   const [data, setData] = useState<Drama[]>([])
@@ -8,8 +8,8 @@ export function useForYou(page = 1) {
 
   useEffect(() => {
     setLoading(true)
-    api.get(`/foryou/${page}?lang=in`)
-      .then(res => setData(res.data.data?.list || []))
+    api.get(`/home?page=${page}&size=10&lang=th`)
+      .then((res: any) => setData(res.data.data?.list || []))
       .catch(() => setData([]))
       .finally(() => setLoading(false))
   }, [page])
@@ -17,61 +17,48 @@ export function useForYou(page = 1) {
   return { data, loading }
 }
 
-export function useRank(type: 1 | 2 | 3) {
+export function useRank() {
   const [data, setData] = useState<Drama[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
-    api.get(`/rank/${type}?lang=in`)
-      .then(res => setData(res.data.data?.list || []))
+    api.get(`/rank?lang=th`)
+      .then((res: any) => setData(res.data.data?.list || []))
       .catch(() => setData([]))
       .finally(() => setLoading(false))
-  }, [type])
+  }, [])
 
   return { data, loading }
 }
 
-export function useCategory(tagId: number, page = 1) {
-  const [data, setData] = useState<Drama[]>([])
+export function useDramaDetail(id: string) {
+  const [data, setData] = useState<Drama | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!id) { setLoading(false); return }
     setLoading(true)
-    api.get(`/classify?lang=in&pageNo=${page}&pageSize=15&sort=1&tag=${tagId}`)
-      .then(res => setData(res.data.data?.list || []))
-      .catch(() => setData([]))
+    api.get(`/drama/${id}?lang=th`)
+      .then((res: any) => setData(res.data.data))
+      .catch(() => setData(null))
       .finally(() => setLoading(false))
-  }, [tagId, page])
+  }, [id])
 
   return { data, loading }
 }
 
-export function useChapters(bookId: string) {
-  const [data, setData] = useState<Chapter[]>([])
+export function useEpisodes(bookId: string) {
+  const [data, setData] = useState<Episode[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get(`/chapters/${bookId}?lang=in`)
-      .then(res => setData(res.data.data?.chapterList || []))
+    if (!bookId) { setLoading(false); return }
+    api.get(`/drama/${bookId}/episodes?lang=th`)
+      .then((res: any) => setData(res.data.data?.episodes || res.data.data?.chapterList || []))
       .catch(() => setData([]))
       .finally(() => setLoading(false))
   }, [bookId])
-
-  return { data, loading }
-}
-
-export function useWatch(bookId: string, chapter: number) {
-  const [data, setData] = useState<WatchData | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    setLoading(true)
-    api.get(`/watch/${bookId}/${chapter}?lang=in&direction=1`)
-      .then(res => setData(res.data.data))
-      .catch(() => setData(null))
-      .finally(() => setLoading(false))
-  }, [bookId, chapter])
 
   return { data, loading }
 }
@@ -83,8 +70,8 @@ export function useSearch(keyword: string) {
   useEffect(() => {
     if (!keyword) { setData([]); return }
     setLoading(true)
-    api.get(`/search/${keyword}/1?lang=in&pageSize=20`)
-      .then(res => setData(res.data.data?.list || []))
+    api.get(`/search?keyword=${encodeURIComponent(keyword)}&page=1&lang=th`)
+      .then((res: any) => setData(res.data.data?.list || []))
       .catch(() => setData([]))
       .finally(() => setLoading(false))
   }, [keyword])
@@ -92,28 +79,15 @@ export function useSearch(keyword: string) {
   return { data, loading }
 }
 
-export function useSuggest(keyword: string) {
-  const [data, setData] = useState<Drama[]>([])
-
-  useEffect(() => {
-    if (!keyword) { setData([]); return }
-    api.get(`/suggest/${keyword}?lang=in`)
-      .then(res => setData(res.data.data?.suggestList || []))
-      .catch(() => setData([]))
-  }, [keyword])
-
-  return data
-}
-
-export function useNewInfinite() {
+export function useHomeInfinite() {
   const [data, setData] = useState<Drama[]>([])
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(true)
 
   useEffect(() => {
-    api.get(`/new/1?lang=in&pageSize=50`)
-      .then(res => {
+    api.get(`/home?page=1&size=50&lang=th`)
+      .then((res: any) => {
         const list = res.data.data?.list || []
         setData(list)
         setHasMore(list.length >= 50)
@@ -125,12 +99,12 @@ export function useNewInfinite() {
   const loadMore = useCallback(() => {
     if (loading || !hasMore) return
     setLoading(true)
-    api.get(`/new/${page}?lang=in&pageSize=50`)
-      .then(res => {
+    api.get(`/home?page=${page}&size=50&lang=th`)
+      .then((res: any) => {
         const list = res.data.data?.list || []
-        setData(prev => [...prev, ...list])
+        setData((prev: Drama[]) => [...prev, ...list])
         setHasMore(list.length >= 50)
-        setPage(p => p + 1)
+        setPage((p: number) => p + 1)
       })
       .finally(() => setLoading(false))
   }, [page, loading, hasMore])

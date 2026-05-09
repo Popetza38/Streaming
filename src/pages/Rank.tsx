@@ -1,57 +1,51 @@
-import { TrendingUp, Users, Star } from 'lucide-react';
+import { TrendingUp, Users, Crown, Medal, Award, Play } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../store/language';
-import { usePlatform } from '../store/platform';
-import { normalizeDramaList, extractList, type NormalizedDrama } from '../utils/normalize';
-import { usePageMeta } from '../hooks/usePageMeta';
 
-const rankTabs = [
-  { id: 1, name: 'Trending', label: 'Trending' },
-  { id: 2, name: 'Popular', label: 'Popular' },
-  { id: 3, name: 'Latest', label: 'Latest' }
-];
+interface Drama {
+  bookId: string;
+  bookName: string;
+  introduction: string;
+  cover: string;
+  coverWap?: string;
+  chapterCount: number;
+  playCount: string;
+  tags: string[];
+}
+
+const getRankIcon = (index: number) => {
+  if (index === 0) return <Crown size={16} className="text-yellow-500" />;
+  if (index === 1) return <Medal size={16} className="text-zinc-400" />;
+  if (index === 2) return <Award size={16} className="text-amber-700" />;
+  return null;
+};
+
+const getRankStyle = (index: number) => {
+  if (index === 0) return 'bg-gradient-to-br from-yellow-500 to-yellow-600 text-white shadow-lg shadow-yellow-500/30';
+  if (index === 1) return 'bg-gradient-to-br from-zinc-400 to-zinc-500 text-white shadow-lg shadow-zinc-500/30';
+  if (index === 2) return 'bg-gradient-to-br from-amber-600 to-amber-700 text-white shadow-lg shadow-amber-600/30';
+  return 'bg-zinc-800 text-zinc-400 border border-white/10';
+};
 
 const Rank = () => {
-  usePageMeta('Rankings');
-  const [activeTab, setActiveTab] = useState(1);
-  const [dramas, setDramas] = useState<NormalizedDrama[]>([]);
+  const [dramas, setDramas] = useState<Drama[]>([]);
   const [loading, setLoading] = useState(true);
   const { lang } = useLanguage();
-  const { platform } = usePlatform();
 
   useEffect(() => {
     const fetchRankDramas = async () => {
       setLoading(true);
       try {
-        let url: string;
-        if (platform === 'shortmax') {
-          url = `/api/foryou?page=${activeTab}&lang=${lang}&platform=shortmax`;
-        } else if (platform === 'flextv') {
-          url = `/api/tabs/popular?lang=${lang}&platform=flextv`;
-        } else if (platform === 'dramapops') {
-          url = `/api/dramas/popular?limit=20&lang=${lang}&platform=dramapops`;
-        } else if (platform === 'dramabite') {
-          url = `/api/v1/recommend?page=${activeTab - 1}&lang=${lang}&platform=dramabite`;
-        } else if (platform === 'fundrama') {
-          url = `/api/dramas?page=${activeTab - 1}&lang=${lang}&platform=fundrama`;
-        } else {
-          url = `/api/rank/${activeTab}?lang=${lang}&platform=${platform}`;
-        }
-
-        const response = await fetch(url);
+        const response = await fetch(`/api/rank?lang=${lang}`);
         const data = await response.json();
-
-        if (platform === 'shortmax') {
-          const items = data?.data || [];
-          const list = items[0]?.items ? items.flatMap((s: any) => s.items) : items;
-          setDramas(normalizeDramaList(list, platform));
-        } else if (platform === 'dramapops') {
-          const list = extractList(data, platform);
-          setDramas(normalizeDramaList(list, platform));
-        } else {
-          const list = extractList(data, platform);
-          setDramas(normalizeDramaList(list, platform));
+        const isSuccess = data.success || data.data?.success || data.code === 0;
+        if (isSuccess) {
+          const list = data.data?.data?.rankList ||
+                       data.data?.rankList ||
+                       data.data?.list ||
+                       data.list || [];
+          setDramas(list);
         }
       } catch (error) {
         console.error('Failed to fetch rank dramas:', error);
@@ -61,94 +55,153 @@ const Rank = () => {
     };
 
     fetchRankDramas();
-  }, [activeTab, lang, platform]);
+  }, [lang]);
 
   return (
-    <div className="space-y-6 pt-2">
-      <div className="flex items-center gap-2">
-        <TrendingUp size={20} className="text-red-500" />
-        <h1 className="text-xl font-bold">Ranking</h1>
-      </div>
-
-      {/* Rank Tabs */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-        {rankTabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors whitespace-nowrap active:scale-95 ${activeTab === tab.id
-              ? 'bg-red-500 text-white'
-              : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-              }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+    <div className="space-y-6 md:space-y-8 pt-2">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-500/20">
+          <TrendingUp size={20} className="text-white" />
+        </div>
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold">ยอดนิยม</h1>
+          <p className="text-sm text-zinc-500">ซีรีส์ที่ได้รับความนิยมสูงสุด</p>
+        </div>
       </div>
 
       {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full"></div>
+        <div className="flex items-center justify-center py-16 md:py-20">
+          <div className="flex flex-col items-center gap-3">
+            <div className="animate-spin w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full"></div>
+            <span className="text-sm text-zinc-500">กำลังโหลด...</span>
+          </div>
         </div>
       )}
 
-      {/* Drama List */}
-      {!loading && (
-        <div className="space-y-3">
-          {dramas.map((drama, index) => (
-            <Link key={drama.id} to={`/watch/${drama.id}?p=${platform}&cw=${encodeURIComponent(drama.cover || '')}`} className="block">
-              <div className="card p-3.5 hover:bg-zinc-800 active:bg-zinc-700 transition-colors">
-                <div className="flex gap-3">
-                  <div className="relative flex-shrink-0">
-                    <div className="w-16 h-22 sm:w-14 sm:h-20 rounded-lg overflow-hidden bg-zinc-900">
-                      <img
-                        src={drama.cover}
-                        alt={drama.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="absolute -top-1 -left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg">
-                      {index + 1}
-                    </div>
-                  </div>
+      {/* Top 3 Featured - Horizontal on Desktop */}
+      {!loading && dramas.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {dramas.slice(0, 3).map((drama, index) => (
+            <Link
+              key={drama.bookId}
+              to={`/watch/${drama.bookId}`}
+              className="group relative rounded-2xl overflow-hidden bg-zinc-900/50 border border-white/5 hover:border-red-500/30 transition-all"
+            >
+              {/* Rank Badge */}
+              <div className={`absolute top-3 left-3 z-10 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${getRankStyle(index)}`}>
+                {getRankIcon(index) || index + 1}
+              </div>
 
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm mb-1 line-clamp-2">
-                      {drama.name}
-                    </h3>
-                    <p className="text-xs text-muted mb-2 line-clamp-2">
-                      {drama.summary}
-                    </p>
+              {/* Image */}
+              <div className="aspect-[16/10] overflow-hidden">
+                <img
+                  src={drama.coverWap || drama.cover}
+                  alt={drama.bookName}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/50 to-transparent" />
+              </div>
 
-                    <div className="flex items-center gap-3 text-xs text-muted mb-2">
-                      {drama.score != null && drama.score > 0 && (
-                        <div className="flex items-center gap-0.5">
-                          <Star size={11} className="text-yellow-400 fill-yellow-400" />
-                          <span className="text-yellow-400 font-semibold">{drama.score.toFixed(1)}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1">
-                        <Users size={11} />
-                        <span>{drama.playCount || 'N/A'}</span>
-                      </div>
-                      <span>{drama.episodes && drama.episodes > 0 ? `${drama.episodes} ep` : 'Ongoing'}</span>
-                    </div>
+              {/* Content */}
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <h3 className="font-bold text-base md:text-lg mb-1 line-clamp-1 group-hover:text-red-400 transition-colors">
+                  {drama.bookName.trim()}
+                </h3>
+                <p className="text-xs md:text-sm text-zinc-400 line-clamp-1 mb-2">
+                  {drama.introduction}
+                </p>
+                <div className="flex items-center gap-3 text-xs text-zinc-500">
+                  <span className="flex items-center gap-1">
+                    <Users size={12} />
+                    {drama.playCount}
+                  </span>
+                  <span>{drama.chapterCount} ตอน</span>
+                </div>
+              </div>
 
-                    {drama.tags && drama.tags.length > 0 && (
-                      <div className="flex gap-1 flex-wrap">
-                        {drama.tags.slice(0, 2).map((tag, tagIndex) => (
-                          <span key={tagIndex} className="text-xs bg-zinc-800 px-2 py-0.5 rounded text-zinc-300">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+              {/* Play Button on Hover */}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                  <Play size={28} className="text-white ml-1" fill="white" />
                 </div>
               </div>
             </Link>
           ))}
+        </div>
+      )}
+
+      {/* Rest of the List */}
+      {!loading && (
+        <div className="space-y-3 md:space-y-4">
+          <h2 className="text-base md:text-lg font-semibold flex items-center gap-2">
+            <span className="w-1 h-5 bg-zinc-600 rounded-full"></span>
+            อันดับต่อไป
+            <span className="text-sm text-zinc-500 font-normal">({dramas.length - 3} รายการ)</span>
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {dramas.slice(3).map((drama, index) => (
+              <Link
+                key={drama.bookId}
+                to={`/watch/${drama.bookId}`}
+                className="group flex gap-3 p-3 rounded-xl bg-zinc-900/30 hover:bg-zinc-800/50 border border-white/5 hover:border-white/10 transition-all"
+              >
+                {/* Rank */}
+                <div className="flex-shrink-0 w-8 h-8 bg-zinc-800 rounded-lg flex items-center justify-center text-sm font-bold text-zinc-500">
+                  {index + 4}
+                </div>
+
+                {/* Thumbnail */}
+                <div className="flex-shrink-0 w-16 h-22 md:w-20 md:h-28 rounded-lg overflow-hidden bg-zinc-800">
+                  <img
+                    src={drama.coverWap || drama.cover}
+                    alt={drama.bookName}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0 py-1">
+                  <h3 className="font-semibold text-sm md:text-base mb-1 line-clamp-1 group-hover:text-red-400 transition-colors">
+                    {drama.bookName.trim()}
+                  </h3>
+                  <p className="text-xs text-zinc-500 line-clamp-2 mb-2">
+                    {drama.introduction}
+                  </p>
+
+                  <div className="flex items-center gap-3 text-xs text-zinc-500">
+                    <span className="flex items-center gap-1">
+                      <Users size={12} />
+                      {drama.playCount}
+                    </span>
+                    <span>{drama.chapterCount} ตอน</span>
+                  </div>
+
+                  {drama.tags.length > 0 && (
+                    <div className="flex gap-1.5 flex-wrap mt-2">
+                      {drama.tags.slice(0, 3).map((tag, tagIndex) => (
+                        <span key={tagIndex} className="text-xs bg-zinc-800 px-2 py-0.5 rounded-full text-zinc-400">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          {/* Empty State */}
+          {dramas.length === 0 && (
+            <div className="text-center py-16 md:py-20">
+              <div className="w-16 h-16 bg-zinc-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <TrendingUp size={32} className="text-zinc-600" />
+              </div>
+              <p className="text-zinc-500">ไม่พบข้อมูลการจัดอันดับ</p>
+            </div>
+          )}
         </div>
       )}
     </div>
