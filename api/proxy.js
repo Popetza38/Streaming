@@ -15,8 +15,17 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const path = req.url.replace('/api', '');
-  const [pathname, queryString] = path.split('?');
+  let pathname = '';
+  let queryString = '';
+
+  if (req.query && req.query.route) {
+    pathname = '/' + (Array.isArray(req.query.route) ? req.query.route.join('/') : req.query.route);
+    const { route, ...otherQueries } = req.query;
+    queryString = new URLSearchParams(otherQueries).toString();
+  } else {
+    const path = req.url.replace('/api', '');
+    [pathname, queryString] = path.split('?');
+  }
   
   if (!ALLOWED_PATHS.some(p => pathname.startsWith(p))) {
     return res.status(403).json({ error: 'Forbidden' });
