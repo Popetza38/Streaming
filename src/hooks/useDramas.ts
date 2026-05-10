@@ -47,7 +47,7 @@ export const useDramas = () => {
                        data.data?.classifyBookList?.records || 
                        data.data?.list || 
                        data.list || [];
-          setDramas(list);
+          setDramas(list.filter((d: Drama) => d.chapterCount > 0));
         }
       } catch (error) {
         console.error('Failed to fetch dramas:', error);
@@ -88,10 +88,12 @@ export const useInfiniteDramas = () => {
                           data.data?.list ||
                           data.list || [];
 
+        const filteredDramas = newDramas.filter((d: Drama) => d.chapterCount > 0);
+
         if (isLoadMore) {
-          setDramas((prev: Drama[]) => [...prev, ...newDramas]);
+          setDramas((prev: Drama[]) => [...prev, ...filteredDramas]);
         } else {
-          setDramas(newDramas);
+          setDramas(filteredDramas);
         }
 
         // Check if we got a full page of results
@@ -139,7 +141,7 @@ export const useRankDramas = () => {
                        data.data?.rankList || 
                        data.data?.list || 
                        data.list || [];
-          setDramas(list);
+          setDramas(list.filter((d: Drama) => d.chapterCount > 0));
         }
       } catch (error) {
         console.error('Failed to fetch rank dramas:', error);
@@ -175,7 +177,7 @@ export const useSearchDramas = (query: string) => {
                        data.data?.searchList ||
                        data.data?.list ||
                        data.list || [];
-          setDramas(list);
+          setDramas(list.filter((d: Drama) => d.chapterCount > 0));
         }
       } catch (error) {
         console.error('Failed to search dramas:', error);
@@ -245,7 +247,8 @@ export const useCategories = () => {
                            data.data?.classifyBookList?.records ||
                            data.data?.list ||
                            data.list || [];
-              return { tagId, tagName, dramas: list.slice(0, 8) as Drama[] };
+              const filtered = list.filter((d: Drama) => d.chapterCount > 0);
+              return { tagId, tagName, dramas: filtered.slice(0, 8) as Drama[] };
             }
             return { tagId, tagName, dramas: [] };
           } catch {

@@ -58,9 +58,14 @@ const Watch = () => {
         const detailData = await detailResponse.json();
         const isDetailSuccess = detailData.success || detailData.data?.success || detailData.code === 0;
         if (isDetailSuccess) {
-          // Note: detailData contains chapter metadata (bookStatus, performers, ratingConf)
-          // We don't set dramaDetail here because it lacks bookName and cover.
-          // We will extract dramaDetail from the episodes API response instead.
+          const detailObj = detailData.data?.book || detailData.data;
+          if (detailObj) {
+            setDramaDetail({
+              bookName: detailObj.bookName || 'Unknown Drama',
+              cover: detailObj.coverWap || detailObj.cover || '',
+              introduction: detailObj.introduction || detailObj.description || ''
+            });
+          }
           console.log('Drama detail metadata loaded');
         }
 
@@ -74,11 +79,12 @@ const Watch = () => {
           const episodesObj = episodesData.data?.data || episodesData.data;
           
           if (episodesObj) {
-            setDramaDetail({
-              bookName: episodesObj.bookName || detailData.data?.bookName || 'Unknown Drama',
-              cover: episodesObj.cover || episodesObj.coverWap || detailData.data?.cover || '',
-              introduction: episodesObj.description || episodesObj.introduction || detailData.data?.introduction || ''
-            });
+            // Update detail if episodes API has better/more info
+            setDramaDetail(prev => ({
+              bookName: episodesObj.bookName || episodesObj.book?.bookName || prev?.bookName || 'Unknown Drama',
+              cover: episodesObj.cover || episodesObj.coverWap || episodesObj.book?.coverWap || prev?.cover || '',
+              introduction: episodesObj.description || episodesObj.introduction || episodesObj.book?.introduction || prev?.introduction || ''
+            }));
 
             const list = episodesObj.book?.episodeList || 
                          episodesObj.episodeList || 
