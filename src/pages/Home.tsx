@@ -103,7 +103,7 @@ const Home = () => {
           </div>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
-            {featuredDramas.slice(1, 13).map((drama, index) => (
+            {featuredDramas.slice(1, 25).map((drama, index) => (
               <Link key={`foryou-${drama.bookId}-${index}`} to={`/watch/${drama.bookId}`} className="group">
                 <div className="relative aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden mb-2 md:mb-3 bg-zinc-900 shadow-lg">
                   <img

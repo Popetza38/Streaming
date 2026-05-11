@@ -39,7 +39,7 @@ export const useDramas = () => {
   useEffect(() => {
     const fetchDramas = async () => {
       try {
-        const response = await fetch(`/api/home?page=1&size=10&lang=${lang}`);
+        const response = await fetch(`/api/home?page=1&size=30&lang=${lang}`);
         const data = await response.json();
         const isSuccess = data.success || data.data?.success || data.code === 0;
         if (isSuccess) {
