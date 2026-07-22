@@ -8,7 +8,7 @@ export interface PlatformItem {
 }
 
 export const platforms: PlatformItem[] = [
-  { id: 'dramabox', name: 'DramaPop', badge: '11 ep' },
+  { id: 'dramabox', name: 'DramaBox', badge: '11 ep' },
   { id: 'melolo', name: 'Melolo', badge: '17 ep' },
   { id: 'pinedrama', name: 'PineDrama', badge: '8 ep' },
   { id: 'netshort', name: 'NetShort', badge: '7 ep' },

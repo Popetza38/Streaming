@@ -44,7 +44,7 @@ export default function Header() {
             <span className="text-white font-bold text-sm">D</span>
           </div>
           <span className="text-xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent hidden sm:block">
-            DramaPop
+            DramaBox
           </span>
         </Link>
 

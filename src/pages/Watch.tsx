@@ -380,7 +380,7 @@ const Watch = () => {
                       }}
                       className="px-3.5 py-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white rounded-xl text-xs font-semibold transition-all shadow-lg shadow-red-500/25"
                     >
-                      DramaPop
+                      DramaBox
                     </button>
                     <button
                       onClick={() => {
