@@ -1,5 +1,6 @@
-import { Play, Users, Sparkles, ChevronRight, Loader2, Tag } from 'lucide-react';
+import { Play, Users, Sparkles, ChevronRight, Loader2, Tag, Tv } from 'lucide-react';
 import { useDramas, useInfiniteDramas, useCategories } from '../hooks/useDramas';
+import { usePlatform, platforms } from '../store/platform';
 import { Link } from 'react-router-dom';
 import { useEffect, useRef } from 'react';
 
@@ -7,6 +8,8 @@ const Home = () => {
   const { dramas: featuredDramas, loading: featuredLoading } = useDramas();
   const { dramas, loading, loadingMore, hasMore, loadMore } = useInfiniteDramas();
   const { categories, loading: categoriesLoading } = useCategories();
+  const { platform } = usePlatform();
+  const activePlatformObj = platforms.find(p => p.id === platform) || platforms[0];
   const observerRef = useRef<HTMLDivElement>(null);
 
   // Infinite scroll with Intersection Observer
@@ -61,16 +64,27 @@ const Home = () => {
 
             {/* Content */}
             <div className="absolute bottom-0 left-0 right-0 p-4 md:p-8 lg:p-10">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full">
                   <Sparkles size={12} />
                   แนะนำสำหรับคุณ
                 </span>
+                <span className="inline-flex items-center gap-1.5 bg-zinc-900/90 text-zinc-300 border border-white/10 text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-md">
+                  <Tv size={12} className="text-red-400" />
+                  ค่าย: {activePlatformObj.name}
+                </span>
+                {featuredDramas[0].playCount && (
+                  <span className="inline-flex items-center gap-1.5 bg-zinc-900/90 text-zinc-300 border border-white/10 text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-md">
+                    <Users size={12} className="text-red-400" />
+                    {featuredDramas[0].playCount}
+                  </span>
+                )}
               </div>
 
               <h1 className="text-xl md:text-3xl lg:text-4xl font-bold mb-2 md:mb-3 line-clamp-2 max-w-2xl">
                 {featuredDramas[0].bookName.trim()}
               </h1>
+
 
               <p className="text-sm md:text-base text-zinc-300 mb-4 line-clamp-2 max-w-xl hidden sm:block">
                 {featuredDramas[0].introduction}
@@ -103,7 +117,8 @@ const Home = () => {
           </div>
 
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 md:gap-4">
-            {featuredDramas.slice(1, 25).map((drama, index) => (
+            {featuredDramas.slice(1).map((drama, index) => (
+
               <Link key={`foryou-${drama.bookId}-${index}`} to={`/watch/${drama.bookId}`} className="group">
                 <div className="relative aspect-[3/4] rounded-xl md:rounded-2xl overflow-hidden mb-2 md:mb-3 bg-zinc-900 shadow-lg">
                   <img
@@ -142,9 +157,14 @@ const Home = () => {
                   {drama.bookName.trim()}
                 </h3>
 
-                <div className="flex items-center gap-1 text-xs text-zinc-500">
-                  <Users size={10} />
-                  <span>{drama.playCount}</span>
+                <div className="flex items-center justify-between text-xs text-zinc-400 mt-1">
+                  <span className="flex items-center gap-1 font-medium text-zinc-300">
+                    <Users size={11} className="text-red-400" />
+                    {drama.playCount || '10.5k ครั้ง'}
+                  </span>
+                  {drama.chapterCount ? (
+                    <span className="text-zinc-500 text-[11px]">{drama.chapterCount} ตอน</span>
+                  ) : null}
                 </div>
               </Link>
             ))}

@@ -1,7 +1,8 @@
-import { Search, Home, TrendingUp, Grid } from 'lucide-react'
+import { Search, Home, TrendingUp, Grid, Tv, ChevronDown } from 'lucide-react'
 import { Link, useLocation, NavLink } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useLanguage, languages } from '../../store/language'
+import { usePlatform, platforms } from '../../store/platform'
 
 const navItems = [
   { to: '/', icon: Home, label: 'หน้าแรก' },
@@ -13,14 +14,21 @@ export default function Header() {
   const location = useLocation();
   const isSearchPage = location.pathname === '/search';
   const { lang, setLang } = useLanguage();
+  const { platform, setPlatform } = usePlatform();
   const [showLangMenu, setShowLangMenu] = useState(false);
+  const [showPlatformMenu, setShowPlatformMenu] = useState(false);
   const langMenuRef = useRef<HTMLDivElement>(null);
+  const platformMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close language menu when clicking outside
+  const activePlatformObj = platforms.find(p => p.id === platform) || platforms[0];
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (langMenuRef.current && !langMenuRef.current.contains(event.target as Node)) {
         setShowLangMenu(false);
+      }
+      if (platformMenuRef.current && !platformMenuRef.current.contains(event.target as Node)) {
+        setShowPlatformMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -36,7 +44,7 @@ export default function Header() {
             <span className="text-white font-bold text-sm">D</span>
           </div>
           <span className="text-xl font-bold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent hidden sm:block">
-            DramaBox
+            DramaPop
           </span>
         </Link>
 
@@ -61,6 +69,65 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* Platform Selector Dropdown */}
+          <div className="relative" ref={platformMenuRef}>
+            <button
+              onClick={() => setShowPlatformMenu(!showPlatformMenu)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-zinc-900/80 hover:bg-zinc-800 border border-white/10 rounded-xl transition-all text-xs md:text-sm font-medium text-zinc-300 hover:text-white"
+              title="เลือกแพลตฟอร์มซีรีส์"
+            >
+              <Tv size={16} className="text-red-400" />
+              <span className="font-semibold text-white">{activePlatformObj.name}</span>
+              {activePlatformObj.badge && (
+                <span className="hidden lg:inline text-[10px] font-bold bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded">
+                  {activePlatformObj.badge}
+                </span>
+              )}
+              <ChevronDown size={14} className={`text-zinc-400 transition-transform ${showPlatformMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showPlatformMenu && (
+              <div className="absolute top-full right-0 mt-2 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl w-64 max-h-96 overflow-y-auto z-50 shadow-2xl p-2 space-y-1">
+                <div className="px-3 py-2 text-xs font-semibold text-zinc-400 uppercase tracking-wider border-b border-white/5 mb-1">
+                  เลือกแพลตฟอร์ม ({platforms.length})
+                </div>
+                {platforms.map((item) => {
+                  const isSelected = item.id === platform;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setPlatform(item.id);
+                        setShowPlatformMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl transition-all flex items-center justify-between text-sm ${
+                        isSelected
+                          ? 'bg-red-500/20 text-red-400 font-semibold'
+                          : 'text-zinc-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Tv size={14} className={isSelected ? 'text-red-400' : 'text-zinc-500'} />
+                        <span>{item.name}</span>
+                      </div>
+                      {item.badge && (
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            item.status === 'maint'
+                              ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                              : 'bg-zinc-800 text-zinc-400'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Language Selector */}
           <div className="relative" ref={langMenuRef}>
             <button
@@ -111,3 +178,4 @@ export default function Header() {
     </header>
   )
 }
+

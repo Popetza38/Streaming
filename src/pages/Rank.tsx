@@ -1,18 +1,7 @@
-import { TrendingUp, Users, Crown, Medal, Award, Play } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { TrendingUp, Users, Crown, Medal, Award, Play, Tv } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useLanguage } from '../store/language';
-
-interface Drama {
-  bookId: string;
-  bookName: string;
-  introduction: string;
-  cover: string;
-  coverWap?: string;
-  chapterCount: number;
-  playCount: string;
-  tags: string[];
-}
+import { useRankDramas } from '../hooks/useDramas';
+import { usePlatform, platforms } from '../store/platform';
 
 const getRankIcon = (index: number) => {
   if (index === 0) return <Crown size={16} className="text-yellow-500" />;
@@ -29,33 +18,10 @@ const getRankStyle = (index: number) => {
 };
 
 const Rank = () => {
-  const [dramas, setDramas] = useState<Drama[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { lang } = useLanguage();
+  const { dramas, loading } = useRankDramas();
+  const { platform } = usePlatform();
+  const activePlatformObj = platforms.find(p => p.id === platform) || platforms[0];
 
-  useEffect(() => {
-    const fetchRankDramas = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/rank?lang=${lang}`);
-        const data = await response.json();
-        const isSuccess = data.success || data.data?.success || data.code === 0;
-        if (isSuccess) {
-          const list = data.data?.data?.rankList ||
-                       data.data?.rankList ||
-                       data.data?.list ||
-                       data.list || [];
-          setDramas(list);
-        }
-      } catch (error) {
-        console.error('Failed to fetch rank dramas:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRankDramas();
-  }, [lang]);
 
   return (
     <div className="space-y-6 md:space-y-8 pt-2">
