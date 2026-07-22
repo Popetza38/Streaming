@@ -2,7 +2,30 @@ import axios from 'axios';
 
 const API_URL = process.env.API_URL || 'https://api.hoshiyomi.my.id';
 const PRIMARY_KEY = process.env.HOSHIYOMI_API_KEY || process.env.AUTH_TOKEN || 'HOSHIYOMI-FREE-e96e9f3f';
-const API_KEYS = [PRIMARY_KEY, 'HOSHIYOMI-TRIAL'];
+const API_KEYS = Array.from(new Set([PRIMARY_KEY, 'HOSHIYOMI-FREE-e96e9f3f', 'HOSHIYOMI-TRIAL']));
+
+function rewriteM3U8(m3u8Text, baseUrl) {
+  const lines = m3u8Text.split('\n');
+  const rewritten = lines.map(line => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      return line;
+    }
+
+    let absoluteUrl = trimmed;
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      try {
+        absoluteUrl = new URL(trimmed, baseUrl).toString();
+      } catch (e) {
+        return line;
+      }
+    }
+
+    return `/api/stream-proxy?url=${encodeURIComponent(absoluteUrl)}`;
+  });
+
+  return rewritten.join('\n');
+}
 
 async function fetchWithKeyFailover(url) {
   let lastError;
@@ -50,6 +73,30 @@ export default async function handler(req, res) {
     [pathname, queryString] = path.split('?');
   }
 
+  // Stream Proxy endpoint for Vercel
+  if (pathname === '/stream-proxy') {
+    const targetUrl = req.query.url;
+    if (!targetUrl) return res.status(400).send('Missing url parameter');
+
+    try {
+      const response = await axios.get(targetUrl, {
+        responseType: 'arraybuffer',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://www.goodreels.com/'
+        }
+      });
+
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Content-Type', response.headers['content-type'] || 'video/mp2t');
+      return res.send(Buffer.from(response.data));
+    } catch (err) {
+      console.error('Stream proxy error:', err.message);
+      return res.status(500).send('Stream Proxy Failed');
+    }
+  }
+
   let targetPath = pathname;
   const params = new URLSearchParams(queryString);
 
@@ -95,8 +142,10 @@ export default async function handler(req, res) {
     if (typeof rawData === 'string') {
       let cleanText = rawData.trim();
       if (cleanText.includes('#EXTM3U')) {
+        const baseUrl = `${API_URL}/api${targetPath}`;
+        const rewrittenText = rewriteM3U8(cleanText, baseUrl);
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-        return res.send(cleanText);
+        return res.send(rewrittenText);
       }
 
       try {
@@ -116,3 +165,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
